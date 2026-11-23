@@ -1,0 +1,19 @@
+# Offline config: no model download at all (BM25 + rule-based verifier).
+# Used by the tests, the CI, and as a fallback for the demo / Docker image.
+# It is my "lexical baseline", not the real system.
+base: default.yaml
+
+data:
+  dir: data/processed/sample
+
+retrieval:
+  kind: bm25
+
+rerank:
+  kind: lexical
+
+verifier:
+  kind: lexical
+
+calibration:
+  file: null

@@ -1,0 +1,106 @@
+{
+  "dataset": "french",
+  "verifier": "lexical-rules",
+  "n": 60,
+  "accuracy": {
+    "value": 0.7666666666666667,
+    "low": 0.6666666666666666,
+    "high": 0.8666666666666667
+  },
+  "macro_f1": {
+    "value": 0.7654710664753707,
+    "low": 0.652533724284453,
+    "high": 0.8681283164846859
+  },
+  "ece": 0.0819197269896633,
+  "per_class": {
+    "SUPPORTED": {
+      "precision": 0.72,
+      "recall": 0.9,
+      "f1": 0.7999999999999999,
+      "support": 20
+    },
+    "REFUTED": {
+      "precision": 0.7142857142857143,
+      "recall": 0.75,
+      "f1": 0.7317073170731706,
+      "support": 20
+    },
+    "NEI": {
+      "precision": 0.9285714285714286,
+      "recall": 0.65,
+      "f1": 0.7647058823529412,
+      "support": 20
+    }
+  },
+  "confusion_matrix": [
+    [
+      18,
+      2,
+      0
+    ],
+    [
+      4,
+      15,
+      1
+    ],
+    [
+      3,
+      4,
+      13
+    ]
+  ],
+  "alerts": {
+    "threshold": 0.0,
+    "n_alerts": 35,
+    "alert_precision": 0.9428571428571428,
+    "alert_recall": 0.825
+  },
+  "by_category": {
+    "amount": {
+      "n": 6,
+      "accuracy": 0.8333333333333334,
+      "not_supported_rate": 1.0
+    },
+    "date": {
+      "n": 1,
+      "accuracy": 0.0,
+      "not_supported_rate": 0.0
+    },
+    "direction": {
+      "n": 1,
+      "accuracy": 0.0,
+      "not_supported_rate": 0.0
+    },
+    "duration": {
+      "n": 5,
+      "accuracy": 0.6,
+      "not_supported_rate": 0.6
+    },
+    "missing_info": {
+      "n": 20,
+      "accuracy": 0.65,
+      "not_supported_rate": 0.85
+    },
+    "negation": {
+      "n": 3,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "paraphrase": {
+      "n": 20,
+      "accuracy": 0.9,
+      "not_supported_rate": 0.1
+    },
+    "rate": {
+      "n": 1,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "threshold": {
+      "n": 3,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    }
+  }
+}

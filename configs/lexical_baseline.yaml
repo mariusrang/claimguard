@@ -1,0 +1,20 @@
+# Lexical baseline on the real SciFact data: BM25 (no reranker) + rule-based verifier.
+# The word-overlap reranker made BM25 worse (R@5 0.859 -> 0.788), so BM25 order is kept;
+# word overlap is still used to pick the 3 sentences inside each abstract.
+# Runs on any CPU in a few minutes, no model download. It is one of the 5 baselines.
+base: default.yaml
+
+retrieval:
+  kind: bm25
+
+rerank:
+  kind: none
+
+verifier:
+  kind: lexical
+
+calibration:
+  file: null
+
+audit:
+  path: null

@@ -1,0 +1,16 @@
+{"id": 1, "claim": "Vitamin C supplementation does not reduce the incidence of colds in the general population.", "evidence": {"1": [{"sentences": [0], "label": "SUPPORT"}]}, "cited_doc_ids": [1]}
+{"id": 2, "claim": "Vitamin C supplementation halves the incidence of colds in the general population.", "evidence": {"1": [{"sentences": [0], "label": "CONTRADICT"}]}, "cited_doc_ids": [1]}
+{"id": 3, "claim": "Low-dose aspirin reduces the risk of a second heart attack.", "evidence": {"2": [{"sentences": [0], "label": "SUPPORT"}]}, "cited_doc_ids": [2]}
+{"id": 4, "claim": "Aspirin does not increase the risk of gastrointestinal bleeding.", "evidence": {"2": [{"sentences": [2], "label": "CONTRADICT"}]}, "cited_doc_ids": [2]}
+{"id": 5, "claim": "Adults who sleep less than 6 hours perform worse on memory tasks.", "evidence": {"3": [{"sentences": [0], "label": "SUPPORT"}]}, "cited_doc_ids": [3]}
+{"id": 6, "claim": "Statins reduce LDL cholesterol by 30 to 40 percent at a moderate dose.", "evidence": {"4": [{"sentences": [1], "label": "SUPPORT"}]}, "cited_doc_ids": [4]}
+{"id": 7, "claim": "Statins raise LDL cholesterol.", "evidence": {"4": [{"sentences": [0], "label": "CONTRADICT"}]}, "cited_doc_ids": [4]}
+{"id": 8, "claim": "Antibiotics are effective against influenza.", "evidence": {"5": [{"sentences": [0], "label": "CONTRADICT"}]}, "cited_doc_ids": [5]}
+{"id": 9, "claim": "Unnecessary antibiotic use increases bacterial resistance.", "evidence": {"5": [{"sentences": [1], "label": "SUPPORT"}]}, "cited_doc_ids": [5]}
+{"id": 10, "claim": "Aerobic exercise improves insulin sensitivity in type 2 diabetes.", "evidence": {"6": [{"sentences": [0], "label": "SUPPORT"}]}, "cited_doc_ids": [6]}
+{"id": 11, "claim": "Caffeine has a half-life of about 5 hours in healthy adults.", "evidence": {"7": [{"sentences": [1], "label": "SUPPORT"}]}, "cited_doc_ids": [7]}
+{"id": 12, "claim": "Caffeine has a half-life of about 50 hours in healthy adults.", "evidence": {"7": [{"sentences": [1], "label": "CONTRADICT"}]}, "cited_doc_ids": [7]}
+{"id": 13, "claim": "Statins cure type 1 diabetes in children.", "evidence": {}, "cited_doc_ids": [4]}
+{"id": 14, "claim": "Aspirin improves memory consolidation during sleep.", "evidence": {}, "cited_doc_ids": [2, 3]}
+{"id": 15, "claim": "Caffeine prevents lung cancer in smokers.", "evidence": {}, "cited_doc_ids": [7, 8]}
+{"id": 16, "claim": "Vitamin D supplementation lowers blood pressure in athletes.", "evidence": {}, "cited_doc_ids": [9]}

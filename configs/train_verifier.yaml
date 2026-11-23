@@ -1,0 +1,30 @@
+# Training config of the verifier (used by scripts/train_verifier.py)
+base: default.yaml
+
+train:
+  base_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
+  out_dir: models/verifier
+  lr: 2.0e-5
+  epochs: 5
+  batch_size: 16
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_length: 384
+  fp16: false             # DeBERTa-v3 is sometimes unstable in half precision
+  n_neg: 1                # hard negative documents (label NEI) per claim
+  n_sentences: 3
+  augment_with_selected: true
+  seeds: [13, 42, 2026]   # 3 runs to report mean +- std
+
+# hyperparameter search (scripts/train_verifier.py --sweep), 1 seed per combination.
+# SciFact gives only ~1,570 training pairs of ~85 words, so one run takes about 3 min
+# on the free Colab T4: the full 12-run grid fits in one session.
+sweep:
+  lr: [1.0e-5, 2.0e-5, 5.0e-5]
+  batch_size: [16, 32]
+  epochs: [3, 5]
+
+# ablation A5: where does the performance come from?
+ablation_base_models:
+  nli_pretrained: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli   # NLI pre-training + SciFact fine-tuning
+  plain_encoder: microsoft/deberta-v3-base                       # SciFact fine-tuning only

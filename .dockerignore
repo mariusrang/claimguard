@@ -1,0 +1,15 @@
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.coverage
+models
+results
+logs
+notebooks
+report
+data/raw
+data/processed
+tests

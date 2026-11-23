@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (CPU torch to keep the job small)
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Lint
+        run: ruff check .
+      - name: Tests (offline, tiny random models, no download)
+        run: make test
+      - name: Offline end-to-end run on the toy sample
+        run: |
+          python scripts/evaluate.py pipeline --config configs/offline.yaml --out /tmp/results
+          python scripts/evaluate.py given --dataset french --config configs/offline.yaml --out /tmp/results

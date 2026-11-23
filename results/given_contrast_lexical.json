@@ -1,0 +1,78 @@
+{
+  "dataset": "contrast",
+  "verifier": "lexical-rules",
+  "n": 125,
+  "accuracy": {
+    "value": 0.24,
+    "low": 0.168,
+    "high": 0.32
+  },
+  "macro_f1": {
+    "value": 0.12903225806451613,
+    "low": 0.09589041095890412,
+    "high": 0.16161616161616163
+  },
+  "ece": 0.49432452122788895,
+  "per_class": {
+    "SUPPORTED": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    },
+    "REFUTED": {
+      "precision": 1.0,
+      "recall": 0.24,
+      "f1": 0.3870967741935484,
+      "support": 125
+    },
+    "NEI": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    }
+  },
+  "confusion_matrix": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      19,
+      30,
+      76
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "alerts": {
+    "threshold": 0.0,
+    "n_alerts": 106,
+    "alert_precision": 1.0,
+    "alert_recall": 0.848
+  },
+  "by_perturbation": {
+    "antonym": {
+      "n": 41,
+      "accuracy": 0.17073170731707318,
+      "not_supported_rate": 0.6341463414634146
+    },
+    "negation": {
+      "n": 64,
+      "accuracy": 0.296875,
+      "not_supported_rate": 0.9375
+    },
+    "number": {
+      "n": 20,
+      "accuracy": 0.2,
+      "not_supported_rate": 1.0
+    }
+  },
+  "originals_supported_rate": 0.3467741935483871,
+  "consistency": 0.248
+}
