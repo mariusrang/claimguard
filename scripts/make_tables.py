@@ -72,7 +72,7 @@ def main() -> None:
         parts += ["## A4 Aggregation", table(head, [pipeline_row(m["aggregation"], m) for m in p["A4_aggregation"]])]
         parts += ["## A6 Oracle evidence", table(head, [pipeline_row("retrieved evidence", p["main"]), pipeline_row("gold evidence", p["A6_oracle_evidence"])])]
         e = p["errors_fixed_by_oracle"]
-        parts.append(f"{e['fixed']} of the {e['n_errors']} errors ({e['share']:.0%}) disappear with gold evidence, so they come from retrieval.")
+        parts.append(f"With gold evidence, {e['fixed']} of the {e['n_errors']} errors are fixed (before counting the new errors, see the McNemar table).")
         parts += ["McNemar tests:", table(["Comparison", "b", "c", "p-value"], [[n, t["b"], t["c"], f"{t['p_value']:.4f}"] for n, t in p["mcnemar"].items()])]
         parts.append(f"Latency per claim: p50 {p['latency_ms_per_claim']['p50']:.0f} ms, p95 {p['latency_ms_per_claim']['p95']:.0f} ms")
         parts += ["Per-class results (main system):", table(["Class", "Precision", "Recall", "F1", "Support"],

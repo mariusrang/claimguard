@@ -145,17 +145,20 @@ def test_demo_handlers(monkeypatch, tmp_path):
 
     importlib.reload(app)
     app.PIPELINE.audit = None  # do not write logs from the tests
-    verdict, scores, evidence, perf = app.verify_claim_ui(
+    card, scores = app.verify_claim_ui(
         "Tobacco smoking accounts for about 85 percent of lung cancer cases.", "", None, 0.0, 5
     )
-    assert "SUPPORTED" in verdict and set(scores) == {"SUPPORTED", "REFUTED", "NEI"}
-    assert "Inference time" in perf and "Model size" in perf
-    assert app.verify_claim_ui("", "", None, 0.0, 5)[0].startswith("⚠️")
+    assert "Supported by the sources" in card and set(scores) == {"Supported", "Contradicted", "Not in the sources"}
+    assert "Inference time" in card and "Model size" in card
+    assert "cg-msg" in app.verify_claim_ui("", "", None, 0.0, 5)[0]  # empty claim -> error message, no crash
     bad_file = tmp_path / "x.pdf"
     bad_file.write_bytes(b"%PDF")
     assert "upload a .txt" in app.verify_claim_ui("Aspirin helps.", "", str(bad_file), 0.0, 5)[0]
-    summary, colored, rows, _ = app.check_answer_ui(app.ANSWER_EXAMPLE, app.SOURCE_EXAMPLE, None, 0.0)
-    assert "3 claims checked" in summary and len(rows) == 3 and "<span" in colored
+    summary, page, rows = app.check_answer_ui(app.ANSWER_EXAMPLE, app.SOURCE_EXAMPLE, None, 0.0)
+    assert "5 claims checked" in summary and len(rows) == 5
+    assert page.count("class='claim ") == 5 and "Model size" in page
+    # the contradicted rate must come back as contradicted, with the source passage in the margin
+    assert rows[0][2] == "Contradicted" and "3.45%" in page
 
 
 def test_aggrefact_evaluation_logic(offline_pipeline):

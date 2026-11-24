@@ -75,7 +75,7 @@ Macro-F1 over 3 seeds: 0.693 ± 0.010
 | retrieved evidence | 0.683 [0.633, 0.733] | 0.676 [0.620, 0.726] | 0.663 | 0.308 |
 | gold evidence | 0.747 [0.700, 0.790] | 0.743 [0.691, 0.790] | 0.747 | 0.741 |
 
-24 of the 95 errors (25%) disappear with gold evidence, so they come from retrieval.
+With gold evidence, 24 of the 95 errors are fixed (before counting the new errors, see the McNemar table).
 
 McNemar tests:
 
