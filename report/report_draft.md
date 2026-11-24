@@ -6,8 +6,7 @@ fontsize: 10.5pt
 ---
 
 > **Draft status.** Sections 1–5 are written with the real numbers from `results/`.
-> Still to do: Section 6 Discussion and the conclusion paragraph (Marius), the
-> optional contrast-set hand check in 3.4. Remove this box
+> Still to do: final read, optional contrast-set hand check in 3.4, PDF export. Remove this box
 > before exporting to PDF.
 
 ## Abstract
@@ -510,28 +509,28 @@ evidence" to statins instead of to the other drugs.
 
 ## 6. Discussion
 
-[[TODO after results: 2-3 paragraphs. What worked and why; what did not; how far the
-SciFact conclusions transfer (Climate-FEVER, French set); cost / quality trade-off
-against the LLM judge]]
+**What worked.** The biggest improvement came from how we combined the passages. Our majority baseline averages the probabilities across passages. Two passages that say very little can outweigh the one that actually answers the question. With noisy-OR, that one passage can still decide the verdict. Macro-F1 went from 0.369 to 0.676. Starting from an NLI model helped too. It had already learned to recognise when a passage supports or contradicts a claim. After fine-tuning on SciFact, it scored 0.693, compared with 0.509 when we started from plain DeBERTa.
+
+**What surprised us.** We expected better retrieval to lead to better answers. The reranker did find more of the right abstracts near the top, but the final macro-F1 was 0.676 either way. Even with the right abstract, the model still has to pick the sentence that answers the question. What surprised us most was how often a small edit slipped through. The model missed 14 of the 20 number changes in the contrast set. Change a rate from 4.35% to 3.45% and almost every word stays the same, even though the verdict should change. Confidence alone wouldn't solve the problem either. Across the 110 annotated errors, 44 had a confidence score of at least 0.8.
+
+**Beyond SciFact.** On Climate-FEVER, fine-tuning improved macro-F1 by about 0.12 over the zero-shot model. On our French banking set, the model got 57 of 60 claims right, though we wrote those examples ourselves. The picture was more mixed on LLM-AggreFact. Fine-tuning helped on RAGTruth but hurt on news summaries. Across the benchmark sample, mean balanced accuracy was 0.709 after fine-tuning and 0.721 with the zero-shot model. We'd want to know what kinds of documents a team works with before telling them which model to use.
+
+**What a company would still need.** If we showed this to a bank tomorrow, we'd start with an analyst reviewing a draft. In the demo, the analyst can see the source sentence behind a verdict. For a flagged rate, we'd want the amount, currency and date highlighted so the analyst could check all three at a glance. We'd also test a product sheet that lists several rates. Does the tool pick the rate for the right product and period? Is it using the latest version of the sheet? Before a rollout, we'd run a pilot on the bank's own documents and measure how many important mistakes the tool catches and how much time analysts spend reviewing its alerts.
 
 **Limitations.** (1) Faithfulness, not truth: a claim that repeats a wrong document
 is SUPPORTED. (2) The test set has 300 claims, so intervals are wide and small
-differences are not significant. (3) SciFact annotations are incomplete, so some hard
+differences are hard to interpret. (3) SciFact annotations are incomplete, so some hard
 negatives used in training and some "false" positives at test time may be real
 evidence. (4) English training data only; the French set is small and synthetic.
 (5) Sentences are checked one by one without resolving pronouns, and claims that need
-two documents together are not handled. (6) The contrast set labels come from rules. (7) The error categories were first assigned with AI assistance, and the consistency check is a same-day re-annotation by one person, not an agreement between two independent annotators.
+two documents together are not handled. (6) The contrast set labels come from rules. (7) The error categories were first assigned with AI assistance, and both passes took place on the same day. This limits what their agreement tells us about how consistently someone else could apply the categories.
 (8) Long documents with tables are out of scope.
 
 ## 7. Conclusion and Future Work
 
-[[TODO 1 paragraph with the 3 main findings]]
+Three things stuck with us from building ClaimGuard. A small model trained on a similar task came close to the 7B judge on SciFact and ran about 26 times faster on the same GPU. Changing a single number showed us a weakness we'd have missed if we'd only looked at the overall score. And the feature we'd most want as users is being able to click on a verdict and read the sentence behind it, especially when the model sounds sure of itself.
 
-Future work: a learned aggregator when more data is available; claim decomposition
-with a small LLM; multi-hop claims (HoVer); calibration per claim type, since a
-confidence on an amount does not carry the same risk as one on a description; a
-the full LLM-AggreFact benchmark and a direct comparison with MiniCheck; a hook that runs the verifier
-after every assistant answer.
+We'd start by checking confidence separately for different kinds of claims. An analyst might handle a flagged interest rate differently from a flagged product description. With more labelled examples, we'd also test whether a model can learn to combine passages better than noisy-OR. A small LLM could help split longer answers into claims, and HoVer would let us test cases where the evidence comes from two documents. We'd compare ClaimGuard with MiniCheck on the full LLM-AggreFact benchmark. For the demo, we'd add the option to run the verifier automatically after each assistant answer.
 
 ## References
 
