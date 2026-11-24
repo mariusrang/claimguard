@@ -64,7 +64,7 @@ def main() -> None:
         # the seed runs all use temperature 1, so they are comparable with each other
         seeds = [r["main"]["macro_f1"]["value"] for n, r in runs.items() if n.startswith("seed")]
         if len(seeds) > 1:
-            parts.append(f"Macro-F1 over {len(seeds)} seeds: {np.mean(seeds):.3f} ± {np.std(seeds):.3f}")
+            parts.append(f"Macro-F1 over {len(seeds)} seeds: {np.mean(seeds):.3f} ± {np.std(seeds, ddof=1):.3f} (sample std)")
     if "main" in runs:
         p = runs["main"]
         parts += ["## A2 Reranker", table(head, [pipeline_row("with reranker", p["main"]), pipeline_row("without reranker", p["A2_no_reranker"])])]

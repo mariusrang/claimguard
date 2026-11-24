@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,7 +14,22 @@ from claimguard.retrieval.bm25 import BM25Index
 from claimguard.retrieval.rerank import LexicalReranker
 from claimguard.verify.lexical import LexicalVerifier
 
-SAMPLE = Path(__file__).resolve().parents[1] / "data" / "sample"
+ROOT = Path(__file__).resolve().parents[1]
+SAMPLE = ROOT / "data" / "sample"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def processed_sample():
+    """On a fresh clone data/processed/sample does not exist yet (it is made by `make sample`).
+    The demo test needs it, so build it once here: plain `pytest` then works without make."""
+    out = ROOT / "data" / "processed" / "sample"
+    if not (out / "corpus.jsonl").exists():
+        for script, args in (
+            ("preprocess.py", ["--raw", str(SAMPLE), "--out", str(out)]),
+            ("build_contrast_set.py", ["--data", str(out)]),
+        ):
+            subprocess.run([sys.executable, str(ROOT / "data" / "scripts" / script), *args], check=True, cwd=ROOT)
+    return out
 
 WORDS = (
     "vitamin c does not reduce the incidence of colds aspirin risk heart attack statins lower "

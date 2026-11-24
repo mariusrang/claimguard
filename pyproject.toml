@@ -14,6 +14,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]   # so the tests can import app.py without "make"
 addopts = "-q"
 
 [tool.ruff]

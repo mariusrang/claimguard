@@ -3,20 +3,21 @@
 #   docker build -t claimguard .
 #   docker run -p 7860:7860 claimguard                  -> http://localhost:7860
 #
-# By default the container starts with the config given in CLAIMGUARD_CONFIG.
-# The neural models are downloaded from the Hugging Face hub at the first start
-# (mount a volume on /root/.cache/huggingface to keep them between runs).
-# If they cannot be loaded, the app falls back to the offline rule-based baseline,
-# so the container always starts.
+# By default the container runs the offline config: rule-based baseline on a small
+# sample, no download, starts in a few seconds on any machine.
 #
-# To run my fine-tuned verifier, mount the models folder:
-#   docker run -p 7860:7860 -v $(pwd)/models:/app/models -v $(pwd)/data/processed:/app/data/processed claimguard
+# Full system (my fine-tuned verifier + the SciFact index), mount the two folders and
+# switch the config:
+#   docker run -p 7860:7860 -e CLAIMGUARD_CONFIG=configs/default.yaml \
+#     -v "$(pwd)/models:/app/models" -v "$(pwd)/data/processed:/app/data/processed" claimguard
+# The retrieval models are downloaded from the Hugging Face hub at the first start.
+# If something is missing, the app falls back to the offline baseline and says so.
 
 FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    CLAIMGUARD_CONFIG=configs/default.yaml \
+    CLAIMGUARD_CONFIG=configs/offline.yaml \
     PORT=7860
 
 WORKDIR /app
@@ -42,4 +43,6 @@ COPY app.py ./
 RUN python data/scripts/preprocess.py --raw data/sample --out data/processed/sample
 
 EXPOSE 7860
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860', timeout=4)"
 CMD ["python", "app.py"]

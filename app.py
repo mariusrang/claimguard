@@ -46,11 +46,15 @@ CSS_CLASS = {"SUPPORTED": "ok", "REFUTED": "no", "NEI": "na", "UNCERTAIN": "un"}
 def load_pipeline() -> tuple[ClaimGuard, str]:
     """Build the pipeline. If the models cannot be loaded, fall back to the offline config."""
     try:
-        return build_pipeline(load_config(CONFIG_PATH)), ""
+        cfg = load_config(CONFIG_PATH)
+        if not Path(cfg["data"]["dir"], "corpus.jsonl").exists():
+            # e.g. a fresh clone or the Docker image without the SciFact data mounted
+            raise FileNotFoundError(f"no corpus in {cfg['data']['dir']}")
+        return build_pipeline(cfg), ""
     except Exception as err:  # no internet, missing checkpoint... the demo should still start
         note = (
-            f"The neural verifier could not be loaded ({type(err).__name__}), "
-            "so this page runs the rule-based baseline instead."
+            f"The full system could not be loaded ({type(err).__name__}: {err}), so this page runs "
+            "the rule-based baseline on a 20-document sample. Its confidence is not calibrated."
         )
         print(note, err)
         return build_pipeline(load_config("configs/offline.yaml")), note
@@ -76,7 +80,7 @@ FACTS = model_facts()
 
 def model_sentence() -> str:
     if FACTS["params_m"] is None:
-        return f"Verifier: {FACTS['name']} (rule-based, no neural model)."
+        return f"Verifier: {FACTS['name']} (rule-based baseline, no neural model, confidence not calibrated)."
     return f"Verifier: {FACTS['name']}, {FACTS['params_m']:.0f}M parameters, {FACTS['size_mb']:.0f} MB."
 
 
@@ -292,6 +296,8 @@ def claim_card(result: ClaimResult) -> str:
 def verify_claim_ui(claim: str, sources_text: str, sources_file: str | None, threshold: float, top_k: int):
     """Handler of tab 2: the verdict card, the probabilities (for the Label) and the footer."""
     try:
+        if claim and len(claim.split()) < 3:
+            raise InvalidInputError("Type a full factual sentence (at least 3 words).")
         sources = read_sources(sources_text, sources_file)
         PIPELINE.threshold, PIPELINE.top_k = float(threshold), int(top_k)
         start = time.perf_counter()

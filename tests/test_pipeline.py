@@ -151,9 +151,10 @@ def test_demo_handlers(monkeypatch, tmp_path):
     assert "Supported by the sources" in card and set(scores) == {"Supported", "Contradicted", "Not in the sources"}
     assert "Inference time" in card and "Model size" in card
     assert "cg-msg" in app.verify_claim_ui("", "", None, 0.0, 5)[0]  # empty claim -> error message, no crash
+    assert "at least 3 words" in app.verify_claim_ui("ok", "", None, 0.0, 5)[0]  # too short to be a claim
     bad_file = tmp_path / "x.pdf"
     bad_file.write_bytes(b"%PDF")
-    assert "upload a .txt" in app.verify_claim_ui("Aspirin helps.", "", str(bad_file), 0.0, 5)[0]
+    assert "upload a .txt" in app.verify_claim_ui("Aspirin lowers the risk of heart attack.", "", str(bad_file), 0.0, 5)[0]
     summary, page, rows = app.check_answer_ui(app.ANSWER_EXAMPLE, app.SOURCE_EXAMPLE, None, 0.0)
     assert "5 claims checked" in summary and len(rows) == 5
     assert page.count("class='claim ") == 5 and "Model size" in page

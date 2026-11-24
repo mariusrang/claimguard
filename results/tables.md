@@ -42,7 +42,7 @@ Paired permutation test on recall@5, against BM25:
 | seed42 (models/verifier-seed42) | 0.713 [0.660, 0.763] | 0.707 [0.648, 0.757] | 0.670 | 0.360 |
 | zeroshot (MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli) | 0.617 [0.563, 0.677] | 0.609 [0.550, 0.667] | 0.583 | 0.340 |
 
-Macro-F1 over 3 seeds: 0.693 ± 0.010
+Macro-F1 over 3 seeds: 0.693 ± 0.012 (sample std)
 
 ## A2 Reranker
 

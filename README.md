@@ -3,7 +3,7 @@
 Evidence-based claim verification with calibrated abstention.
 NLP final project — topic 2, *Fact Verification with Evidence Retrieval*.
 
-![tests](https://img.shields.io/badge/tests-63%20passing-brightgreen) ![coverage](https://img.shields.io/badge/coverage-91%25-green) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![tests](https://img.shields.io/badge/tests-67%20passing-brightgreen) ![coverage](https://img.shields.io/badge/coverage-90%25-green) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 ## Overview
 
@@ -25,7 +25,7 @@ abstention are treated as first-class results, with one metric that anyone can r
 out of 10 alerts, how many are real problems. (2) The verifier is stress-tested on
 what hurts most in practice: edited numbers, negations and opposite words (a contrast
 set), a French banking test set, and an out-of-domain test (Climate-FEVER). (3) It is
-deployable: a Gradio demo, a Docker image, an INT8 version, and an MCP server so that
+deployable: a Gradio demo, a Docker image and an MCP server so that
 Claude can call the verifier as a tool, with an audit log of every verdict.
 
 One limit to keep in mind: ClaimGuard measures **faithfulness to the documents**, not
@@ -42,7 +42,7 @@ a CUDA GPU for training (a free Kaggle or Colab T4 is enough). Everything else a
 git clone <this repo> && cd claimguard
 python -m venv .venv && source .venv/bin/activate
 make install          # pip install -r requirements-dev.txt && pip install -e .
-make test             # 63 unit tests, no download needed
+make test             # 67 unit tests (plain `pytest` works too), no download needed
 ```
 
 Quick try without downloading any model (BM25 + rule-based verifier on a toy corpus):
@@ -127,12 +127,15 @@ plan but ran out of GPU memory, see `DECISIONS.md`.
 
 (dev macro-F1, gold evidence.) The spread is small: the best setting (5e-5, 3 epochs)
 beats the default (2e-5, 5 epochs) by 0.003, which is less than the seed-to-seed
-variation (±0.010 on test). I kept the default for the 3 seeds, so the reported numbers
+variation (±0.012 on test). I kept the default for the 3 seeds, so the reported numbers
 do not depend on a lucky grid point.
 
 The pipeline settings are also chosen on dev only (`results/calibration.json`): k = 3
 documents, noisy-OR aggregation, temperature T = 2.42 fitted on claim-level NLL,
-abstention threshold 0.5. The test set is used once, for the tables below.
+abstention threshold 0.5. One design choice was revised after a look at test numbers: an
+early run of the rule-based baseline showed that fitting T on passage pairs made the
+test ECE worse (0.206 → 0.258), so T is now fitted on claim-level probabilities (see
+`DECISIONS.md`). All the values used (T, k, aggregation, threshold) are chosen on dev.
 
 ## Training
 
@@ -174,8 +177,8 @@ Ablations A1–A6 are listed in `PLAN.md`.
 ### Results
 
 Unless said otherwise, numbers are on the SciFact test split I made (300 claims,
-never used for any choice), and brackets are 95% bootstrap confidence intervals.
-"± 0.010" is the standard deviation over the 3 training seeds. The stress tests at the
+no value was tuned on it; see the note on calibration above), and brackets are 95% bootstrap confidence intervals.
+"± 0.012" is the sample standard deviation over the 3 training seeds. The stress tests at the
 end use their own test sets. Full tables: `results/tables.md`, figures:
 `results/figures/`.
 
@@ -200,7 +203,7 @@ Dense + reranker vs BM25: +0.076 recall@5, paired permutation test p = 0.0007.
 | BM25 + zero-shot DeBERTa NLI | 0.570 [0.515, 0.625] | - |
 | Full retrieval + zero-shot DeBERTa NLI | 0.609 [0.550, 0.667] | - |
 | Full retrieval + LLM judge (Qwen2.5-7B-Instruct, 4-bit) | 0.671 [0.612, 0.722] | 15.4 s (T4) |
-| **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.010** | 0.6 s (T4), 1.0 s (CPU) |
+| **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.012** | 0.6 s (T4), 1.0 s (CPU) |
 | ClaimGuard with gold evidence (oracle) | 0.743 [0.691, 0.790] | - |
 
 The main system used everywhere else (seed 13, with the temperature T = 2.42 chosen on
@@ -330,13 +333,22 @@ needs an instruction in the system prompt (or a hook, see Future Work).
 
 ```bash
 docker build -t claimguard .
-docker run -p 7860:7860 claimguard
-# with my trained verifier and the SciFact index:
-docker run -p 7860:7860 -v $(pwd)/models:/app/models -v $(pwd)/data/processed:/app/data/processed claimguard
+docker run -p 7860:7860 claimguard          # http://localhost:7860
 ```
 
-The image is CPU-only. Models are downloaded at the first start; if that fails the
-app falls back to the offline baseline, so the container always starts.
+By default the image runs the offline config (rule-based baseline on a 20-document
+sample, no download), so it starts in a few seconds on any machine. To run the full
+system, mount my fine-tuned verifier and the processed SciFact data, and switch the
+config (Windows PowerShell: replace `$(pwd)` with `${PWD}`):
+
+```bash
+docker run -p 7860:7860 -e CLAIMGUARD_CONFIG=configs/default.yaml \
+  -v "$(pwd)/models:/app/models" -v "$(pwd)/data/processed:/app/data/processed" claimguard
+```
+
+The image is CPU-only. If a model or the corpus is missing, the app falls back to the
+offline baseline and shows a note at the top of the page. A health check pings the
+page every 30 s (`docker ps` shows `healthy`).
 
 ## Project Structure
 
@@ -348,7 +360,7 @@ claimguard/
 │   ├── scripts/             # download.py, preprocess.py, build_contrast_set.py
 │   ├── sample/              # toy corpus for tests and offline demo
 │   └── french_bank/         # French banking test set + data card
-├── models/                  # checkpoints + calibration.json (not committed)
+├── models/                  # baseline.py, advanced.py, utils.py (point to src/); checkpoints not committed
 ├── src/claimguard/
 │   ├── retrieval/           # bm25.py, dense.py, hybrid.py, rerank.py
 │   ├── verify/              # nli.py, train.py, lexical.py, llm_judge.py
@@ -358,7 +370,7 @@ claimguard/
 ├── scripts/                 # train_verifier.py, evaluate.py, make_tables.py, make_figures.py
 ├── notebooks/               # 03_kaggle_run_all.ipynb, 01_colab_run_all.ipynb, 02_error_analysis.ipynb
 ├── configs/                 # default.yaml, offline.yaml, train_verifier.yaml
-├── tests/                   # 63 tests: preprocessing, retrieval, metrics, model, pipeline
+├── tests/                   # 67 tests: preprocessing, retrieval, metrics, model, pipeline
 ├── app.py                   # Gradio demo
 ├── Dockerfile  Makefile  requirements.txt  pyproject.toml
 ├── README.md  PLAN.md  DECISIONS.md

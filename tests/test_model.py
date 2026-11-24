@@ -175,3 +175,12 @@ def test_training_stops_on_nan_loss(tiny_nli_model, tiny_tokenizer, tmp_path):
     with pytest.raises(RuntimeError, match="loss is nan"):
         train_verifier(pairs, pairs, tmp_path / "ckpt", epochs=1, batch_size=2, lr=1e-3, max_length=32,
                        device="cpu", model=tiny_nli_model, tokenizer=tiny_tokenizer)
+
+
+def test_models_folder_exposes_the_classes():
+    """models/baseline.py, advanced.py and utils.py (structure asked by the guidelines) import fine."""
+    import importlib
+
+    for name in ("models.baseline", "models.advanced", "models.utils"):
+        module = importlib.import_module(name)
+        assert module.__all__ and all(hasattr(module, obj) for obj in module.__all__)
