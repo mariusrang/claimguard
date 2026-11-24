@@ -120,8 +120,10 @@ Abstention (after temperature scaling):
 | --- | --- | --- | --- | --- | --- |
 | climate | models/verifier | 1381 | 0.563 [0.535, 0.589] | 0.522 [0.495, 0.547] | 0.113 |
 | climate_lexical | lexical-rules | 1381 | 0.487 [0.462, 0.513] | 0.386 [0.361, 0.410] | 0.063 |
+| climate_zeroshot | MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli | 1381 | 0.406 [0.382, 0.432] | 0.405 [0.381, 0.431] | 0.434 |
 | contrast | models/verifier | 125 | 0.736 [0.656, 0.808] | 0.283 [0.264, 0.298] | 0.183 |
 | contrast_lexical | lexical-rules | 125 | 0.240 [0.168, 0.320] | 0.129 [0.096, 0.162] | 0.494 |
+| contrast_zeroshot | MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli | 125 | 0.560 [0.472, 0.648] | 0.239 [0.214, 0.262] | 0.333 |
 | french | models/verifier | 60 | 0.950 [0.883, 1.000] | 0.949 [0.885, 1.000] | 0.033 |
 | french_lexical | lexical-rules | 60 | 0.767 [0.667, 0.867] | 0.765 [0.653, 0.868] | 0.082 |
 | french_multilingual | MoritzLaurer/mDeBERTa-v3-base-mnli-xnli | 60 | 0.933 [0.867, 0.983] | 0.934 [0.866, 0.985] | 0.065 |
@@ -145,6 +147,16 @@ given_contrast_lexical — by perturbation:
 | number | 20 | 0.200 | 1.000 |
 
 given_contrast_lexical: originals predicted SUPPORTED 0.347, consistency 0.248
+
+given_contrast_zeroshot — by perturbation:
+
+| Group | n | Accuracy | Not-SUPPORTED rate |
+| --- | --- | --- | --- |
+| antonym | 41 | 0.634 | 0.976 |
+| negation | 64 | 0.641 | 0.922 |
+| number | 20 | 0.150 | 0.700 |
+
+given_contrast_zeroshot: originals predicted SUPPORTED 0.468, consistency 0.424
 
 given_french — by category:
 
@@ -200,8 +212,9 @@ given_french_multilingual — by category:
 
 | Model | Size (MB) | p50 ms / claim | p95 ms / claim | Seconds / 1,000 claims | Accuracy (gold evidence) | Macro-F1 S/R (gold evidence) |
 | --- | --- | --- | --- | --- | --- | --- |
-| fp32_cpu | 738 | 1019 | 1062 | 1017 | 0.856 | nan |
-| int8_cpu | 481 | 882 | 922 | 888 | 0.407 | nan |
+| fp32_cpu | 738 | 1037 | 1103 | 1042 | 0.856 | 0.881 |
+| int8_cpu | 481 | 918 | 954 | 921 | 0.407 | 0.311 |
+| int8_ffn_cpu | 568 | 949 | 996 | 955 | 0.455 | 0.333 |
 
 ## Hyperparameter search (dev set)
 

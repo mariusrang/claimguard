@@ -1,0 +1,78 @@
+{
+  "dataset": "contrast",
+  "verifier": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+  "n": 125,
+  "accuracy": {
+    "value": 0.56,
+    "low": 0.472,
+    "high": 0.648
+  },
+  "macro_f1": {
+    "value": 0.23931623931623933,
+    "low": 0.21376811594202896,
+    "high": 0.2621359223300971
+  },
+  "ece": 0.3334640733884938,
+  "per_class": {
+    "SUPPORTED": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    },
+    "REFUTED": {
+      "precision": 1.0,
+      "recall": 0.56,
+      "f1": 0.717948717948718,
+      "support": 125
+    },
+    "NEI": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 0
+    }
+  },
+  "confusion_matrix": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      12,
+      70,
+      43
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "alerts": {
+    "threshold": 0.0,
+    "n_alerts": 113,
+    "alert_precision": 1.0,
+    "alert_recall": 0.904
+  },
+  "by_perturbation": {
+    "antonym": {
+      "n": 41,
+      "accuracy": 0.6341463414634146,
+      "not_supported_rate": 0.975609756097561
+    },
+    "negation": {
+      "n": 64,
+      "accuracy": 0.640625,
+      "not_supported_rate": 0.921875
+    },
+    "number": {
+      "n": 20,
+      "accuracy": 0.15,
+      "not_supported_rate": 0.7
+    }
+  },
+  "originals_supported_rate": 0.46774193548387094,
+  "consistency": 0.424
+}

@@ -191,3 +191,9 @@ to be able to explain without notes.
     feed-forward layers. A negative result that is measured is still a result.
 - **Results of the two runs are merged** in `results/` (see `results/PROVENANCE.md`): run 1
   for everything that does not use the fine-tuned model, run 2 for the rest.
+- **24 Nov, run 3: INT8 dropped for this model.** Quantizing only the feed-forward layers
+  did not save the verifier either (accuracy with gold evidence 0.856 FP32, 0.407 all layers,
+  0.455 feed-forward only) and the CPU speed-up is about 10% (1.04 s -> 0.92-0.95 s per claim).
+  Dynamic INT8 is not a free lunch for DeBERTa-v3; the demo and the MCP server keep FP32.
+  Static quantization with calibration data, ONNX Runtime or a distilled smaller verifier are
+  listed as future work.

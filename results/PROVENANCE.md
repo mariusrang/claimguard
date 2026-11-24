@@ -10,3 +10,6 @@ Two Kaggle runs (GPU T4), 23-24 Nov 2026.
   The sweep ran the 6 batch-size-16 settings; batch size 32 ran out of GPU memory in float32 on the T4.
 - Rule-based results (pipeline_lexical, given_*_lexical, calibration_lexical, baselines) are identical in
   every run (no randomness, no GPU).
+- Run 3 (notebook 05, 24 Nov, same trained verifier as run 2, loaded from the run-2 output): given_climate_zeroshot,
+  given_contrast_zeroshot, efficiency.json (3 INT8 recipes), and per-example predictions on Climate-FEVER and the
+  contrast set. given_climate / given_contrast were re-computed and are identical to run 2 (deterministic inference).

@@ -2,28 +2,41 @@
   "fp32_cpu": {
     "size_mb": 737.779371,
     "accuracy_gold_evidence": 0.8564593301435407,
-    "macro_f1_gold_evidence": 0.5870646766169154,
+    "macro_f1_sr_gold_evidence": 0.8805970149253731,
     "latency_5_pairs": {
-      "p50_ms": 1018.5044564996133,
-      "p95_ms": 1061.8346835501143,
-      "mean_ms": 1017.0998665666351,
-      "calls_per_second": 0.9831876228394778,
+      "p50_ms": 1037.1672424999474,
+      "p95_ms": 1103.0284520999828,
+      "mean_ms": 1042.4433257666578,
+      "calls_per_second": 0.9592847642480293,
       "n_runs": 30
     },
-    "seconds_per_1000_claims": 1017.0998665666351
+    "seconds_per_1000_claims": 1042.4433257666578
   },
   "int8_cpu": {
     "size_mb": 481.258179,
     "accuracy_gold_evidence": 0.40669856459330145,
-    "macro_f1_gold_evidence": 0.20757020757020758,
+    "macro_f1_sr_gold_evidence": 0.31135531135531136,
     "latency_5_pairs": {
-      "p50_ms": 882.3237570004494,
-      "p95_ms": 921.6936376501053,
-      "mean_ms": 887.8561623666732,
-      "calls_per_second": 1.126308564817972,
+      "p50_ms": 918.1656650000605,
+      "p95_ms": 954.2500138000264,
+      "mean_ms": 920.6194371999989,
+      "calls_per_second": 1.0862251649187766,
       "n_runs": 30
     },
-    "seconds_per_1000_claims": 887.8561623666732
+    "seconds_per_1000_claims": 920.6194371999989
+  },
+  "int8_ffn_cpu": {
+    "size_mb": 567.928907,
+    "accuracy_gold_evidence": 0.45454545454545453,
+    "macro_f1_sr_gold_evidence": 0.3333333333333333,
+    "latency_5_pairs": {
+      "p50_ms": 949.2295164999973,
+      "p95_ms": 995.5440799999508,
+      "mean_ms": 955.3462233333485,
+      "calls_per_second": 1.0467409359832374,
+      "n_runs": 30
+    },
+    "seconds_per_1000_claims": 955.3462233333485
   },
   "n_parameters": 184424451,
   "n_pairs": 209
