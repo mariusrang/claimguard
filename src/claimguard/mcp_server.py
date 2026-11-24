@@ -2,6 +2,9 @@
 
 Run it with:   python -m claimguard.mcp_server
 Config file:   env variable CLAIMGUARD_CONFIG (default: configs/default.yaml)
+Project folder: env variable CLAIMGUARD_HOME. Claude Desktop starts the server from
+                its own folder, so the relative paths of the config (data/, models/)
+                would not be found without it.
 
 Tools:
 - verify_claim      one claim against given sources (or the indexed corpus)
@@ -34,6 +37,8 @@ def get_pipeline() -> ClaimGuard:
     """Load the pipeline once, the first time a tool is called (models are slow to load)."""
     global _pipeline
     if _pipeline is None:
+        if os.environ.get("CLAIMGUARD_HOME"):
+            os.chdir(os.environ["CLAIMGUARD_HOME"])  # relative paths of the config start here
         cfg = load_config(os.environ.get("CLAIMGUARD_CONFIG", "configs/default.yaml"))
         _pipeline = build_pipeline(cfg)
     return _pipeline

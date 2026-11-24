@@ -5,10 +5,10 @@ geometry: margin=2.2cm
 fontsize: 10.5pt
 ---
 
-> **Draft status.** Sections 1–3 and the experimental protocol are written. Every
-> `[[TODO ...]]` is a number, table, figure or paragraph that can only be written
-> after the runs (`notebooks/01_colab_run_all.ipynb`) and the manual annotation.
-> Nothing in this file is a result yet. Remove this box before exporting to PDF.
+> **Draft status.** Sections 1–5 are written with the real numbers from `results/`.
+> Still to do: Cohen's κ (second annotation pass), Section 6 Discussion and the
+> conclusion paragraph (Marius), the contrast-set hand check in 3.4. Remove this box
+> before exporting to PDF.
 
 ## Abstract
 
@@ -18,16 +18,17 @@ collection and returns SUPPORTED, REFUTED or NOT ENOUGH INFO with the evidence a
 calibrated confidence. The pipeline combines hybrid retrieval (BM25 and a dense
 encoder fused with Reciprocal Rank Fusion), cross-encoder reranking, a DeBERTa-v3
 verifier fine-tuned on SciFact, multi-evidence aggregation and temperature scaling.
-On the SciFact test set the full system reaches [[TODO macro-F1 with 95% CI]]
-against [[TODO]] for a zero-shot NLI baseline and [[TODO]] for an open-source LLM
-judge. An oracle experiment shows that [[TODO x%]] of the errors come from retrieval.
-On sentences written by LLMs (LLM-AggreFact) the same pipeline reaches a balanced
-accuracy of [[TODO]]. After temperature scaling the expected calibration error drops from [[TODO]] to
-[[TODO]], and with an abstention threshold of [[TODO]] the precision of the alerts
-reaches [[TODO]] for a coverage of [[TODO]]. We stress-test the verifier on a
-contrast set with edited numbers, negations and antonyms, on a French banking test
-set and on Climate-FEVER, and analyse [[TODO n ≥ 100]] errors by hand. The system
-ships with a demo, a Docker image and an MCP server with an audit log.
+On the SciFact test set the full system reaches 0.693 ± 0.010 macro-F1 (3 seeds),
+against 0.609 for a zero-shot NLI baseline and 0.671 for a 7B open-source LLM judge
+that is 26 times slower. With gold evidence, macro-F1 rises to 0.743: retrieval
+causes some errors, but the verifier is the main bottleneck. On sentences written by
+LLMs (LLM-AggreFact) the verifier reaches a mean balanced accuracy of 0.709. After
+temperature scaling the expected calibration error drops from 0.260 to 0.141, and
+with a threshold of 0.8 the alerts are right 90.5% of the time for a coverage of 70%.
+A contrast set shows that the verifier catches 97% of negation edits but only 30% of
+changed numbers. A manual analysis of 110 errors finds that the most frequent failure
+is treating evidence on the right topic as proof. The system ships with a demo, a
+Docker image and an MCP server with an audit log.
 
 <!-- 150-200 words once the numbers are in -->
 
@@ -61,7 +62,7 @@ swapped and measured alone; (ii) an evaluation with five baselines, six ablation
 confidence intervals and significance tests; (iii) a calibration and abstention
 study with a metric that non-technical readers understand, the precision of the
 alerts; (iv) three stress tests; (v) an evaluation of the same pipeline on sentences written
-by LLMs (LLM-AggreFact); (vi) a manual analysis of [[TODO n]] errors; and (vii) a
+by LLMs (LLM-AggreFact); (vi) an analysis of 110 errors; and (vii) a
 deployable tool: demo, Docker image, INT8 model and an MCP server with an audit log.
 
 One limit frames everything that follows: the system measures whether a claim is
@@ -175,8 +176,9 @@ evidence and answers with one letter; we read the logits of the three letters.
 edited claims with one rule: change a number, add or remove a negation, or swap a
 direction word for its opposite. We report the share of edited claims that are no
 longer predicted SUPPORTED and the consistency (right on the original and reacts to
-the edit). [[TODO: n examples per rule; share of a hand-checked sample of 50 where
-the edit really breaks the support]]
+the edit). This gives 125 edited claims: 20 number edits, 64 negation edits and 41
+direction edits. [[TODO optional: share of a hand-checked sample of 50 where the edit
+really breaks the support]]
 
 **French banking set.** 60 claims on 20 invented documents (20 per label); REFUTED
 claims change an amount, a rate, a duration, a threshold, a date, a direction or a
@@ -194,7 +196,7 @@ verifier and the aggregation run as above. We evaluate on LLM-AggreFact (Tang et
 2024), which gathers summaries and RAG answers written by several LLMs, each sentence
 labelled supported or not by humans. The task is binary, so SUPPORTED is compared
 with REFUTED or NEI, and we report balanced accuracy per sub-dataset and its mean,
-the benchmark's own metric. Because of the Colab budget we use 100 claims per
+the benchmark's own metric. Because of the GPU budget we use 100 claims per
 sub-dataset; numbers are therefore not directly comparable with the full leaderboard.
 
 ### 3.6 Evaluation protocol
@@ -210,110 +212,321 @@ measured with ECE (10 bins), the risk-coverage curve and its area (AURC), and al
 precision and recall. The verifier is trained with 3 seeds. Every headline number
 has a 95% bootstrap interval (1,000 resamples); systems are compared with McNemar's
 exact test, retrievers with a paired permutation test on recall@5. We report raw
-p-values for [[TODO n]] comparisons and read them with that in mind.
+p-values for 9 comparisons (4 McNemar tests, 5 permutation tests) and read them with that in mind.
 
 ## 4. Experiments
 
+All experiments ran on a free Kaggle T4 GPU (16 GB) in three unattended sessions;
+CPU numbers come from the same Kaggle machine. Unless said otherwise, results are on
+our SciFact test split (300 claims), brackets are 95% bootstrap intervals, and
+"± x" is the standard deviation over the 3 training seeds.
+
 ### 4.1 Retrieval (A1, A2)
 
-[[TODO table from results/tables.md: BM25 / dense / hybrid, with and without
-reranker: R@1, R@5, R@20, P@5, MRR; permutation tests against BM25]]
+Table 1 – Retrieval on the 188 test claims that have gold evidence.
 
-[[TODO 3-4 sentences: which retriever wins, is the gain significant, what the
-reranker adds, what recall@50 says about the ceiling for the next stages]]
+| Retriever | R@1 | R@5 | R@20 | MRR |
+| --- | --- | --- | --- | --- |
+| BM25 (ours) | 0.712 | 0.859 | 0.943 | 0.798 |
+| BM25 + rerank | 0.750 | 0.913 | 0.945 | 0.840 |
+| Dense (BGE-small) | 0.744 | 0.898 | **0.979** | 0.834 |
+| Dense + rerank | **0.760** | **0.935** | 0.975 | **0.856** |
+| Hybrid (RRF) | 0.741 | 0.912 | 0.966 | 0.836 |
+| Hybrid + rerank | 0.755 | 0.934 | 0.972 | 0.850 |
+
+Our BM25 is already a strong baseline (R@5 = 0.859), which is expected on SciFact
+where claims reuse the technical words of the abstract. The dense encoder finds more
+of the gold abstracts in the top 20 (0.979), and the cross-encoder turns this into a
+better top 5: dense + rerank gains +0.076 R@5 over BM25 (paired permutation test,
+p = 0.0007). Hybrid fusion alone is close to dense alone (+0.052 vs +0.039 over BM25),
+and once the reranker is applied dense and hybrid end at the same R@5 (0.935 vs
+0.934). The reranker adds more than the choice between dense and hybrid.
 
 ### 4.2 Hyperparameter search
 
-All experiments run on a free Colab T4 GPU. [[TODO table from results/sweep.json
-(12 runs: learning rate × batch size × epochs), the chosen configuration, one
-sentence on how sensitive the model is to the learning rate]]
+Table 2 – Dev macro-F1 of the verifier (gold evidence), batch size 16, one seed.
+
+| Learning rate | 3 epochs | 5 epochs |
+| --- | --- | --- |
+| 1e-5 | 0.824 | 0.842 |
+| 2e-5 | 0.829 | 0.855 |
+| 5e-5 | **0.858** | 0.855 |
+
+Batch size 32 was planned but did not fit in the T4 memory in float32. All six runs
+are within 0.034 of each other, and the best one (5e-5, 3 epochs) is only 0.003 above
+our default (2e-5, 5 epochs), less than the seed-to-seed variation. We kept the
+default for the three seeds so the test numbers do not depend on one lucky grid point.
 
 ### 4.3 Main results and baselines
 
-[[TODO table: 5 baselines + our system (mean ± std over 3 seeds): accuracy, macro-F1
-with CI, FEVER score, evidence F1; McNemar p-values against the main system]]
+Table 3 – End-to-end results on SciFact test (300 claims).
 
-[[TODO paragraph: what the claim-only baseline says about the dataset; gap between
-zero-shot NLI and the fine-tuned model; position of the LLM judge, with its latency]]
+| System | Accuracy | Macro-F1 | Time / claim |
+| --- | --- | --- | --- |
+| Majority class | 0.413 [0.360, 0.467] | 0.195 [0.176, 0.212] | – |
+| Claim only (TF-IDF + LR) | 0.437 [0.377, 0.497] | 0.401 [0.345, 0.457] | – |
+| Rules (numbers, negation, overlap) | 0.517 [0.460, 0.577] | 0.475 [0.422, 0.533] | – |
+| BM25 + zero-shot NLI | 0.580 [0.527, 0.637] | 0.570 [0.515, 0.625] | – |
+| Full retrieval + zero-shot NLI | 0.617 [0.563, 0.677] | 0.609 [0.550, 0.667] | – |
+| Full retrieval + LLM judge (Qwen2.5-7B, 4-bit) | 0.687 [0.633, 0.733] | 0.671 [0.612, 0.722] | 15.4 s (T4) |
+| **ClaimGuard, 3 seeds** | 0.701 ± 0.012 | **0.693 ± 0.010** | 0.6 s (T4), 1.0 s (CPU) |
+| ClaimGuard, main system (seed 13, T = 2.42) | 0.683 [0.633, 0.733] | 0.676 [0.620, 0.726] | 0.6 s (T4) |
+
+Per class (main system): SUPPORTED F1 0.742, REFUTED 0.667, NEI 0.618.
+
+The claim-only baseline reaches 0.401 macro-F1 without reading any evidence, twice the
+majority class: part of the label can be guessed from the wording of the claim alone,
+as already reported for FEVER (Schuster et al., 2019). Every system that reads
+evidence has to beat this number to show it uses the evidence. Reading evidence with a
+zero-shot NLI model adds 0.21, and fine-tuning on SciFact adds another 0.08. The
+fine-tuned 184M-parameter verifier is level with the 7B LLM judge (0.693 vs 0.671, the
+intervals overlap), while being about 26 times faster on the same GPU and able to run
+on CPU. NEI is the hardest class: it is the one where "the passage talks about the
+topic" must not be read as "the passage supports the claim" (Section 5).
 
 ### 4.4 Ablations (A3–A6)
 
-[[TODO table A3: k = 1, 3, 5, 10 + figure ablation_k.png]]
-[[TODO table A4: majority / max-confidence / noisy-OR + McNemar]]
-[[TODO table A5: zero-shot NLI / plain encoder + SciFact / NLI + SciFact]]
-[[TODO table A6: retrieved vs gold evidence; share of errors fixed by gold evidence]]
+Table 4 – Ablations on the main system (macro-F1 on test).
 
-[[TODO one short paragraph per ablation with the conclusion]]
+| Ablation | Setting | Macro-F1 |
+| --- | --- | --- |
+| A2 reranker | with / without | 0.676 / 0.676 |
+| A3 evidence passages k | 1 / 3 / 5 / 10 | 0.678 / 0.676 / 0.675 / 0.667 |
+| A4 aggregation | majority / max-confidence / noisy-OR | 0.369 / 0.681 / 0.676 |
+| A5 verifier | zero-shot NLI / plain DeBERTa + SciFact / NLI + SciFact (3 seeds) | 0.609 / 0.509 / 0.693 |
+| A6 evidence | retrieved / gold (oracle) | 0.676 / 0.743 |
+
+**A2.** The reranker improves retrieval (Table 1) but not the final verdict:
+McNemar b = 20, c = 21, p = 1.0. A likely reason is that the documents the reranker
+moves into the top 5 were often already among the passages the verifier reads.
+**A3.** k barely matters between 1 and 5 (Figure `ablation_k.png`); k = 10 loses a
+little because more neutral passages enter the aggregation. k = 3 was chosen on dev.
+**A4.** This is the largest effect of the study. A hard majority vote collapses to
+0.369, because most passages of a claim are neutral, so NEI wins the vote even when
+one passage clearly supports or refutes. Noisy-OR and max-confidence let one strong
+passage decide (noisy-OR vs majority: b = 106, c = 37, p < 0.0001; noisy-OR vs
+max-confidence: p = 1.0).
+**A5.** Starting from an NLI checkpoint is essential: the same architecture
+fine-tuned from plain DeBERTa-v3-base gets 0.509, below the zero-shot NLI model.
+SciFact alone (687 training claims) is too small to learn the task from scratch.
+**A6.** With gold evidence, 24 of the 95 errors are fixed but 5 new ones appear, a
+net gain of 19 (McNemar p = 0.0005), and macro-F1 rises to 0.743. Retrieval is
+therefore responsible for some errors, but most of them remain with perfect
+evidence: the verifier is the main bottleneck.
 
 ### 4.5 Calibration and abstention
 
-[[TODO figure reliability.png, figure risk_coverage.png; T, ECE and AURC before and
-after; table: threshold, coverage, selective accuracy, alert precision, alert recall]]
+The raw model is over-confident: before scaling, ECE is 0.260. Temperature scaling
+with T = 2.42 (fitted on dev, at the claim level) reduces it by 46% to 0.141
+(Figure `reliability.png`). The AURC moves from 0.142 to 0.153: temperature changes
+the noisy-OR aggregation, so it can change the ranking of the claims and not only
+their confidence.
 
-[[TODO paragraph: is the raw model over-confident; what the chosen threshold costs in
-coverage; how many high-confidence errors remain (these cannot be caught by abstention)]]
+Table 5 – Abstention after temperature scaling. An alert is a REFUTED or NEI verdict.
+
+| Threshold | Coverage | Selective accuracy | Alert precision | Alert recall |
+| --- | --- | --- | --- | --- |
+| 0.0 | 1.000 | 0.683 | 0.841 | 0.750 |
+| 0.5 (chosen on dev) | 0.980 | 0.694 | 0.850 | 0.739 |
+| 0.7 | 0.823 | 0.753 | 0.876 | 0.642 |
+| 0.8 | 0.697 | 0.794 | 0.905 | 0.540 |
+| 0.9 | 0.363 | 0.881 | 0.935 | 0.165 |
+
+Macro-F1 in Tables 3–4 is always computed on the model's best guess; UNCERTAIN
+answers only appear here. The threshold of 0.5 chosen on dev answers 98% of the
+claims. A user who wants alerts that are right 9 times out of 10 can move to 0.8 and
+keep 70% coverage, at the cost of missing about half of the problems (alert recall
+0.540). Figure `risk_coverage.png` shows the whole trade-off.
 
 ### 4.6 Stress tests
 
-[[TODO table contrast set: not-SUPPORTED rate per edit type and consistency, for the
-rules, the zero-shot NLI model and the fine-tuned verifier]]
-[[TODO table French set: English verifier / multilingual verifier / rules, accuracy
-per category]]
-[[TODO table Climate-FEVER: accuracy, macro-F1, ECE (calibration under domain shift)]]
+Table 6 – Contrast set (125 edited claims generated from the 124 SUPPORTED test
+claims, gold evidence given; a rule only applies when the claim has a number, a
+negation or a direction word). "Detected" = the edited claim is no longer predicted SUPPORTED.
 
-Measured so far, without any neural model (CPU runs, 23 Nov): the rule-based verifier
-reaches 0.77 accuracy on the French set (n = 60) and 0.49 accuracy / 0.39 macro-F1 on
-Climate-FEVER (n = 1,381). On the contrast set it stops saying SUPPORTED for 100% of the
-number edits and 94% of the negation edits, but it calls only 35% of the untouched
-claims SUPPORTED, so its consistency is 0.25: a high flip rate alone is misleading.
+| Edit | n | Fine-tuned | Zero-shot NLI | Rules |
+| --- | --- | --- | --- | --- |
+| Number changed | 20 | **0.30** | 0.70 | 1.00 |
+| Negation added / removed | 64 | **0.97** | 0.92 | 0.94 |
+| Direction word swapped | 41 | **0.88** | 0.98 | 0.63 |
+| Originals predicted SUPPORTED | | **0.87** | 0.47 | 0.35 |
+| Consistency (original right and edit detected) | | **0.728** | 0.424 | 0.248 |
+
+The fine-tuned model is the only one that both accepts the original claims and
+reacts to the edits, hence the much higher consistency. The zero-shot model and the
+rules look good on "detected" only because they reject most claims anyway (they keep
+fewer than half of the unedited originals). The clear weakness is numbers: the
+fine-tuned verifier misses 70% of changed numbers, so "a rate of 4.35%" and "a rate
+of 3.45%" look almost identical to it. Fine-tuning made this worse than the
+zero-shot model (0.30 vs 0.70): SciFact rarely hinges on an exact number.
+
+Table 7 – Verifier given the evidence, other test sets.
+
+| Test set | Metric | Fine-tuned | Zero-shot NLI | Rules |
+| --- | --- | --- | --- | --- |
+| Climate-FEVER (1,381) | macro-F1 | **0.522** [0.495, 0.547] | 0.405 [0.381, 0.431] | 0.386 [0.361, 0.410] |
+| Climate-FEVER | ECE | 0.113 | 0.434 | 0.063 |
+| French banking (60) | macro-F1 | **0.949** [0.885, 1.000] | 0.934 [0.866, 0.985] (multilingual) | 0.765 [0.653, 0.868] |
+
+On Climate-FEVER, a new domain with noisier evidence, the fine-tuned verifier keeps a
+clear lead over the zero-shot model (+0.12) and stays much better calibrated (ECE
+0.113 vs 0.434). On our French banking set, the English verifier gets 57 of 60 right,
+slightly above the multilingual NLI model (56 of 60). Its 3 errors are all
+"missing information" claims, the hardest category for both models (17 of 20). The set is small and we wrote it
+ourselves, so this only shows that the pipeline is usable on French text, not that it
+is better than the multilingual model.
 
 ### 4.7 Sentences written by LLMs
 
-[[TODO table from results/tables.md: balanced accuracy per LLM-AggreFact sub-dataset
-and mean, for the rules, zero-shot NLI and the fine-tuned verifier; latency per claim]]
+Table 8 – LLM-AggreFact, balanced accuracy, 100 claims per sub-dataset.
 
-[[TODO paragraph: does fine-tuning on SciFact help or hurt on LLM outputs; which
-sub-datasets are hardest and why (long documents? RAG vs summaries?)]]
+| Sub-dataset | Fine-tuned | Zero-shot NLI | Rules |
+| --- | --- | --- | --- |
+| AggreFact-CNN | 0.583 | **0.739** | 0.522 |
+| AggreFact-XSum | 0.603 | 0.666 | **0.677** |
+| TofuEval-MediaS | 0.638 | **0.686** | 0.610 |
+| TofuEval-MeetB | **0.796** | 0.795 | 0.762 |
+| Wice | 0.659 | **0.712** | 0.512 |
+| ExpertQA | 0.574 | 0.539 | **0.586** |
+| ClaimVerify | **0.732** | 0.695 | 0.657 |
+| FactCheck-GPT | 0.733 | **0.740** | 0.584 |
+| Lfqa | **0.860** | 0.800 | 0.716 |
+| RAGTruth | **0.769** | 0.748 | 0.680 |
+| Reveal | **0.850** | 0.812 | 0.664 |
+| **Mean** | 0.709 | **0.721** | 0.634 |
+
+On average, fine-tuning on SciFact does not help on LLM outputs (0.709 vs 0.721). The
+picture depends on the kind of text: the fine-tuned model is better on the RAG and
+long-form QA sets (Lfqa, RAGTruth, Reveal, ClaimVerify), where a sentence is checked
+against retrieved passages as in SciFact, and worse on summaries of news and of
+dialogues (AggreFact-CNN −0.16, TofuEval-MediaS −0.05). With 100 claims per
+sub-dataset, differences of a few points are within noise.
 
 ### 4.8 Efficiency
 
-[[TODO table: FP32 vs INT8 on CPU: size, p50 and p95 latency per claim, seconds per
-1,000 claims, macro-F1 with gold evidence; end-to-end latency on GPU; LLM judge
-latency for comparison]]
+Table 9 – Verifier on CPU (one claim = 5 passages, 30 runs), gold-evidence accuracy
+on 209 pairs.
+
+| Version | Size | p50 | p95 | Accuracy |
+| --- | --- | --- | --- | --- |
+| FP32 (184M parameters) | 738 MB | 1,037 ms | 1,103 ms | **0.856** |
+| INT8 dynamic, all linear layers | 481 MB | 918 ms | 954 ms | 0.407 |
+| INT8 dynamic, feed-forward only | 568 MB | 949 ms | 996 ms | 0.455 |
+
+On GPU the full pipeline takes 627 ms per claim (p50; p95 790 ms). Dynamic INT8
+quantization saves 35% of the size but only 11% of the time, and destroys accuracy,
+even when the attention layers are kept in FP32. We kept FP32: at about one second
+per claim on CPU, the demo is usable without a GPU.
 
 ## 5. Error Analysis
 
-<!-- at least 2 pages in the final PDF -->
-
-**Protocol.** We export every wrong prediction of the main system on the test set
-([[TODO n]] errors), completed with [[TODO n]] errors sampled from Climate-FEVER to
-reach [[TODO ≥ 100]]. Each error is first tagged automatically: *retrieval miss* (the
-claim has gold evidence and none of it was given to the verifier) or *verification
-error*; presence of a number; presence of a negation. Then each error receives one
-category by hand (taxonomy in Table [[TODO]]). To check the consistency of the
-categories, 25 errors were annotated a second time one week later:
+**Protocol.** We export every wrong prediction of the main system on the SciFact test
+set (95 errors) and add the 15 errors of a random sample of Climate-FEVER, which
+gives 110 errors. Each error is first tagged automatically: *retrieval miss* (the
+claim has gold evidence and none of it reached the verifier) or *verification
+error*, presence of a number, presence of a negation. Then each error receives one
+category (taxonomy in Table 10), with a short note justifying it. The annotation was
+done with the help of an AI assistant; the categories and notes were then reviewed.
+To check the consistency of the categories, 25 errors were annotated a second time
+one week later without the assistant and without seeing the first labels:
 agreement [[TODO]], Cohen's κ = [[TODO]].
 
 ### 5.1 Quantitative breakdown
 
-[[TODO figure errors.png + table: category, count, share, share of retrieval misses,
-mean confidence]]
-[[TODO table: confusion matrix of the errors (gold × predicted)]]
-[[TODO error rate for claims with / without a number, with / without a negation, by
-claim length; error rate by confidence bin]]
+Table 10 – Error categories (110 errors).
+
+| Category | Definition | SciFact | Climate | Total | Main confusion |
+| --- | --- | --- | --- | --- | --- |
+| Wrong sentences | right document, but the sentences given to the verifier are not the ones that decide | 25 | 7 | 32 (29%) | SUPPORTED → NEI |
+| Related but insufficient | the model predicts SUPPORTED from related evidence that fails to establish an essential part of the claim | 17 | 2 | 19 (17%) | NEI → SUPPORTED |
+| REFUTED vs NEI | evidence goes against the claim without contradicting it, or the reverse | 11 | 4 | 15 (14%) | NEI → REFUTED |
+| Domain vocabulary | the decision depends on a technical term or relation the model misreads | 15 | 0 | 15 (14%) | NEI → SUPPORTED |
+| Evidence not retrieved | no gold document reached the verifier | 9 | 0 | 9 (8%) | REFUTED → NEI |
+| Numbers | wrong reading of a number, unit or statistical result | 4 | 1 | 5 (5%) | SUPPORTED → NEI |
+| Multi-sentence evidence | the proof needs two sentences together | 5 | 0 | 5 (5%) | SUPPORTED → NEI |
+| Negation / quantifier | wrong scope of "not", "no evidence", "often" | 4 | 1 | 5 (5%) | REFUTED → SUPPORTED |
+| Gold label questionable | our reading of the evidence disagrees with the gold label | 5 | 0 | 5 (5%) | NEI → SUPPORTED |
+
+Figure `errors.png` shows the same counts. Three numbers stand out.
+
+* **Errors are made with confidence.** 44 of the 110 errors have a confidence of at
+  least 0.8 (mean 0.728 over the 110, 0.746 over the 95 SciFact errors). A threshold
+  can filter the hesitant errors, not these ones.
+* **The most frequent confusion is NEI → SUPPORTED** (39 of 110). On SciFact, NEI
+  claims have the highest error rate (48 of 112, 43%), against 34% for REFUTED (22 of
+  64) and 20% for SUPPORTED (25 of 124).
+* **Numbers and negations are not where SciFact errors are.** Claims with a number
+  have an error rate of 29% (33 of 114) against 33% for the others (62 of 186); claims
+  with a negation 24% (7 of 29) against 33%. This looks like it contradicts the
+  contrast set, but it does not: SciFact claims that contain a number rarely depend
+  on its exact value ("1,000 Genomes project", "1/2000 in the UK"), whereas the
+  contrast set is built so that the number is the only thing that changes.
 
 ### 5.2 Qualitative analysis
 
-[[TODO for each of the 4-5 biggest categories: 2 examples with the claim, the
-evidence shown to the model, gold and predicted labels, and one sentence explaining
-what went wrong]]
+(Evidence shortened. Translated from our annotation notes.)
+
+**Wrong sentences.** Claim 128, *"Arterioles have a larger lumen diameter than
+venules"* (gold NEI, predicted SUPPORTED, 0.88). The retrieved abstract compares the
+aorta with the coronary arteries; venules never appear. The sentences given to the
+verifier speak about vessel diameter, so the model accepts the comparison. Claim 3
+(gold SUPPORTED, predicted NEI, 0.83) is the reverse case: the claim is supported
+by its gold evidence, but the sentences given to the verifier come from a study of
+the gene PPM1D and say nothing about the penetrance of the 1,000 Genomes variants. In both cases the error comes from the sentence selection step, which ranks
+sentences by similarity to the claim instead of by how much they decide it.
+
+**Related but insufficient.** Claim 36, *"A deficiency of vitamin B12 increases blood
+levels of homocysteine"* (gold NEI, predicted SUPPORTED, 0.74). The abstract reports a
+diet that lowers homocysteine while vitamin B12 *stays unchanged*: same topic, same
+two entities, but nothing about a deficiency. Claim 350 (0.82) is similar: IF3 takes
+part in translation initiation, which does not show that it discriminates between the
+two tRNAs. The model checks that the claim's entities and relation appear in the
+passage, not that the specific link the claim asserts is established.
+
+**REFUTED vs NEI.** Claim 213, *"CRP is not predictive of postoperative mortality
+following CABG surgery"* (gold NEI, predicted REFUTED, 0.92). The abstract links CRP
+to long-term mortality after bypass surgery; the claim is about the postoperative
+period, which the abstract does not measure. The model reads "associated with
+mortality" as a contradiction of "not predictive of mortality" without checking the
+time frame.
+
+**Domain vocabulary.** The pair of claims 268 and 269 is telling: *"Cold exposure
+increases BAT recruitment"* is predicted SUPPORTED (0.82) and *"Cold exposure reduces
+BAT recruitment"* is predicted REFUTED (0.82), while both are NEI (the second one is
+counted under REFUTED vs NEI). The abstract says
+that cold makes brown adipose tissue express Ucp1, a thermogenic response, but never
+measures recruitment of the tissue. The model treats "express Ucp1" and "recruit BAT"
+as the same thing, which a biologist would not.
+
+**Negation scope.** Claim 1290, *"There is an inverse relationship between hip
+fractures and statin use"* (gold SUPPORTED, predicted REFUTED, 0.91). The abstract
+says the risk falls with statin use and that there is "no evidence of such
+relationships with nonstatin lipid-lowering agents". The model attaches "no
+evidence" to statins instead of to the other drugs.
 
 ### 5.3 What the errors tell us
 
-[[TODO 4-5 findings, each ending with what to do about it. Template:
-"x% of the errors are retrieval misses → improving the verifier cannot fix them;
-the next step is ...". "High-confidence errors are mostly of type ... → abstention
-does not help there; ...". "Gold labels look questionable in n cases → ..."]]
+1. **The verifier judges topic overlap more than support.** Related but insufficient,
+   domain vocabulary and most NEI → SUPPORTED errors (39 of 110) share the same
+   pattern. *Fix:* add hard negatives built from the gold abstract itself (sentences of
+   the right abstract that do not support the claim, labelled NEI) so that the model
+   learns that the right topic is not enough.
+2. **Sentence selection is the first bottleneck after the verifier** (32 errors), and
+   it is not solved by a better retriever (the reranker did not change the end-to-end
+   score). *Fix:* select sentences with the verifier's own scores, or give the
+   verifier the whole abstract when it fits in 512 tokens.
+3. **Confidence does not separate these errors.** 40% of them are made with at least
+   0.8 confidence, so abstention protects against hesitant errors only. *Fix:* report
+   the decisive passage to the user, as the demo does, so a human can check it in a
+   few seconds.
+4. **Numbers are a hidden risk.** They are rare in SciFact errors but the contrast
+   set shows that the model misses 70% of changed numbers, which matters most for the
+   use cases we target (banking, prices, dates). *Fix:* a rule that compares the
+   numbers of the claim and of the decisive sentence before the verifier, as in our
+   lexical baseline, which flags 100% of number edits (it also rejects many true
+   claims, so it should only send a warning, not decide alone).
+5. **Some labels are debatable** (5 of 110). This is small, but with 300 test claims
+   it is of the same order as the gap between two systems in Table 3.
 
 ## 6. Discussion
 

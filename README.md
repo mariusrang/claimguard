@@ -173,9 +173,11 @@ Ablations A1–A6 are listed in `PLAN.md`.
 
 ### Results
 
-All numbers are on the SciFact test split I made (300 claims, never used for any
-choice), with 95% bootstrap confidence intervals. Full tables: `results/tables.md`,
-figures: `results/figures/`.
+Unless said otherwise, numbers are on the SciFact test split I made (300 claims,
+never used for any choice), and brackets are 95% bootstrap confidence intervals.
+"± 0.010" is the standard deviation over the 3 training seeds. The stress tests at the
+end use their own test sets. Full tables: `results/tables.md`, figures:
+`results/figures/`.
 
 **Retrieval** (188 claims with gold evidence)
 
@@ -201,22 +203,28 @@ Dense + reranker vs BM25: +0.076 recall@5, paired permutation test p = 0.0007.
 | **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.010** | 0.6 s (T4), 1.0 s (CPU) |
 | ClaimGuard with gold evidence (oracle) | 0.743 [0.691, 0.790] | - |
 
-The calibrated main system (seed 13 + temperature + threshold) gets 0.676 macro-F1:
-abstaining costs a little F1 but makes the confidence usable (below).
+The main system used everywhere else (seed 13, with the temperature T = 2.42 chosen on
+dev) gets 0.676 macro-F1; the same seed without temperature gets 0.685. The gap comes
+from the temperature, which changes how noisy-OR combines the passages, not from
+abstention: macro-F1 is always computed on the model's best guess, and UNCERTAIN
+answers are evaluated separately (coverage and selective accuracy, below).
 
 **Key findings**
 
-1. *Fine-tuning a 184M encoder matches a 7B LLM judge* (0.693 vs 0.671 macro-F1), at
-   about 25 times less time per claim, on CPU, with no API.
+1. *Fine-tuning a 184M encoder matches a 7B LLM judge* (0.693 vs 0.671 macro-F1). On
+   the same T4, ClaimGuard takes 0.6 s per claim versus 15.4 s for the LLM judge, about
+   26× faster. ClaimGuard also runs on CPU at 1.0 s per claim, with no API.
 2. *Aggregation matters more than retrieval tricks.* A hard majority vote over passages
    collapses to 0.369 macro-F1 (most passages are neutral, so NEI wins the vote);
    noisy-OR and max-confidence get 0.676 / 0.681 (McNemar p < 0.0001). The reranker
    improves retrieval but changes nothing end to end (p = 1.0).
-3. *Retrieval explains a quarter of the errors.* With gold evidence, 24 of the 95
-   errors disappear (McNemar p = 0.0005). The other three quarters come from the
-   verifier and from sentence selection (see error analysis).
-4. *Calibration.* Temperature scaling (T = 2.42) halves the expected calibration error
-   (0.260 → 0.141). At threshold 0.8, an alert (REFUTED or NEI) is right 90.5% of the
+3. *Most errors are not retrieval failures.* Giving the verifier the gold evidence
+   fixes 24 of the 95 errors but creates 5 new ones, a net drop of 19 errors
+   (macro-F1 0.676 → 0.743, McNemar p = 0.0005). In the manual annotation, the right
+   document is missing for only 9 of the 95 SciFact errors. Both point the same way:
+   most errors come from the verifier and from sentence selection (see error analysis).
+4. *Calibration.* Temperature scaling (T = 2.42) reduces the expected calibration error
+   by 46% (0.260 → 0.141). At threshold 0.8, an alert (REFUTED or NEI) is right 90.5% of the
    time, for 70% coverage.
 
 **Stress tests** (verifier given the evidence, no retrieval)
@@ -241,8 +249,10 @@ layers quantized), so I did not keep it (details in `DECISIONS.md`).
 
 ### Error analysis
 
-I annotated by hand the 95 test errors of the main system plus 15 Climate-FEVER errors
-(`results/Annotation_erreurs_annoté_110.xlsx`, table in `results/errors_table.md`).
+I annotated the 95 SciFact test errors of the main system plus 15 Climate-FEVER
+errors, with the help of an AI assistant (`results/Annotation_erreurs_annoté_110.xlsx`,
+table in `results/errors_table.md`). A second, blind pass on 25 errors gives the
+agreement (Cohen's kappa) between the two passes.
 
 | Category | Errors | Share |
 | --- | --- | --- |
@@ -255,8 +265,9 @@ I annotated by hand the 95 test errors of the main system plus 15 Climate-FEVER 
 | Gold label questionable | 5 | 5% |
 
 The two biggest groups point to the same thing: the model decides from the topic of
-the passage, not from the part of the claim that needs proof. Errors are made with a
-mean confidence of 0.73, so the threshold alone does not catch them.
+the passage, not from the part of the claim that needs proof. The errors are confident:
+44 of the 110 have a confidence of at least 0.8 (mean 0.728 over the 110, 0.746 over the
+95 SciFact errors), so a confidence threshold alone does not catch them.
 
 ## Demo
 
@@ -298,9 +309,9 @@ Claude Desktop (`claude_desktop_config.json`):
 {
   "mcpServers": {
     "claimguard": {
-      "command": "/absolute/path/to/.venv/bin/python",
+      "command": "/absolute/path/to/python",
       "args": ["-m", "claimguard.mcp_server"],
-      "env": {"CLAIMGUARD_CONFIG": "/absolute/path/to/claimguard/configs/default.yaml"}
+      "env": {"CLAIMGUARD_HOME": "/absolute/path/to/claimguard"}
     }
   }
 }
