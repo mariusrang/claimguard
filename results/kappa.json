@@ -1,0 +1,13 @@
+{
+  "n": 25,
+  "agreement": 0.96,
+  "cohen_kappa": 0.951,
+  "disagreements": [
+    {
+      "claim_id": "1280",
+      "category_first": "domain_vocabulary",
+      "category_second": "related_but_insufficient"
+    }
+  ],
+  "protocol": "25 errors sampled at random (seed 2026); first pass with AI assistance, second pass by the author alone, without AI and without the first labels, the same day a few hours later."
+}

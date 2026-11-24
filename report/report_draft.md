@@ -6,8 +6,8 @@ fontsize: 10.5pt
 ---
 
 > **Draft status.** Sections 1–5 are written with the real numbers from `results/`.
-> Still to do: Cohen's κ (second annotation pass), Section 6 Discussion and the
-> conclusion paragraph (Marius), the contrast-set hand check in 3.4. Remove this box
+> Still to do: Section 6 Discussion and the conclusion paragraph (Marius), the
+> optional contrast-set hand check in 3.4. Remove this box
 > before exporting to PDF.
 
 ## Abstract
@@ -417,7 +417,7 @@ claim has gold evidence and none of it reached the verifier) or *verification
 error*, presence of a number, presence of a negation. Then each error receives one
 category (taxonomy in Table 10), with a short note justifying it. The annotation was
 done with the help of an AI assistant; the categories and notes were then reviewed.
-The planned consistency check covers 25 errors: repeat the annotation one week later without AI assistance or access to the first labels. Report agreement [[TODO]] and Cohen's κ [[TODO]] once the paired labels are available.
+To check the consistency of the categories, 25 errors drawn at random were annotated a second time by the author alone, without AI assistance and without access to the first labels, the same day a few hours after the first pass. The two passes agree on 24 of the 25 errors (96%), Cohen's κ = 0.95 (`results/kappa.json`). The only change is claim 1280, moved from domain vocabulary to related but insufficient, two categories that overlap when a technical term hides a missing link. The short delay probably inflates the agreement, so this number shows that the categories are usable, not that they are fully reliable.
 
 ### 5.1 Quantitative breakdown
 
@@ -520,8 +520,8 @@ differences are not significant. (3) SciFact annotations are incomplete, so some
 negatives used in training and some "false" positives at test time may be real
 evidence. (4) English training data only; the French set is small and synthetic.
 (5) Sentences are checked one by one without resolving pronouns, and claims that need
-two documents together are not handled. (6) The contrast set labels come from rules.
-(7) Long documents with tables are out of scope.
+two documents together are not handled. (6) The contrast set labels come from rules. (7) The error categories were first assigned with AI assistance, and the consistency check is a same-day re-annotation by one person, not an agreement between two independent annotators.
+(8) Long documents with tables are out of scope.
 
 ## 7. Conclusion and Future Work
 

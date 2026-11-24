@@ -254,8 +254,10 @@ layers quantized), so I did not keep it (details in `DECISIONS.md`).
 
 I annotated the 95 SciFact test errors of the main system plus 15 Climate-FEVER
 errors, with the help of an AI assistant (`results/Annotation_erreurs_annoté_110.xlsx`,
-table in `results/errors_table.md`). A second, blind pass on 25 errors gives the
-agreement (Cohen's kappa) between the two passes.
+table in `results/errors_table.md`). A second pass on 25 random errors, done by me alone
+without AI and without the first labels (same day, a few hours later), agrees on 24 of
+25 (Cohen's κ = 0.95, `results/kappa.json`). The short delay probably inflates this
+number.
 
 | Category | Errors | Share |
 | --- | --- | --- |
