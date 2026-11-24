@@ -1,5 +1,5 @@
 ---
-title: "ClaimGuard: Evidence-Based Claim Verification with Calibrated Abstention"
+title: "ClaimGuard: Evidence-Based Claim Verification with Abstention"
 author: "Marius Rang — NLP final project, topic 2 (Fact Verification with Evidence Retrieval)"
 geometry: margin=2.2cm
 fontsize: 10.5pt
@@ -14,14 +14,14 @@ fontsize: 10.5pt
 Language models produce fluent answers that are not always supported by their
 sources. We present ClaimGuard, a pipeline that checks a claim against a document
 collection and returns SUPPORTED, REFUTED or NOT ENOUGH INFO with the evidence and a
-calibrated confidence. It combines hybrid retrieval (BM25 and a dense encoder fused with
+confidence score. It combines hybrid retrieval (BM25 and a dense encoder fused with
 Reciprocal Rank Fusion), cross-encoder reranking, a DeBERTa-v3 verifier fine-tuned on
 SciFact, noisy-OR aggregation and temperature scaling. On the SciFact test set it
-reaches 0.693 ± 0.010 macro-F1 over 3 seeds, against 0.609 for a zero-shot NLI baseline
-and 0.671 for a 7B open-source LLM judge that is 26 times slower. Gold evidence raises
+reaches 0.693 ± 0.012 macro-F1 over 3 seeds, against 0.609 for a zero-shot NLI baseline
+and 0.671 for a 7B open-source LLM judge that is 25 times slower. Gold evidence raises
 macro-F1 to 0.743, so most errors come from the verifier, not from retrieval.
-Temperature scaling cuts the expected calibration error from 0.260 to 0.141, and at a
-threshold of 0.8, 90.5% of the alerts are correct for a coverage of 70%. A contrast set
+Temperature scaling cuts the expected calibration error from 0.260 to 0.141, a partial
+gain; at an indicative threshold of 0.8, 90.5% of the alerts are correct for 70% coverage. A contrast set
 shows that the verifier catches 97% of negation edits but only 30% of number edits, and
 a manual analysis of 110 errors finds that its most frequent confusion is treating
 evidence on the right topic as proof. The system ships with a demo, a Docker image and
@@ -58,7 +58,7 @@ confidence intervals and significance tests; (iii) a calibration and abstention
 study with a metric that non-technical readers understand, the precision of the
 alerts; (iv) three stress tests; (v) an evaluation of the same pipeline on sentences written
 by LLMs (LLM-AggreFact); (vi) an analysis of 110 errors; and (vii) a
-deployable tool: demo, Docker image, INT8 model and an MCP server with an audit log.
+deployable tool: demo, Docker image and an MCP server with an audit log.
 
 One limit frames everything that follows: the system measures whether a claim is
 supported **by the documents**. It does not know if the documents are right.
@@ -172,8 +172,7 @@ edited claims with one rule: change a number, add or remove a negation, or swap 
 direction word for its opposite. We report the share of edited claims that are no
 longer predicted SUPPORTED and the consistency (right on the original and reacts to
 the edit). This gives 125 edited claims: 20 number edits, 64 negation edits and 41
-direction edits. [[TODO optional: share of a hand-checked sample of 50 where the edit
-really breaks the support]]
+direction edits.
 
 **French banking set.** 60 claims on 20 invented documents (20 per label); REFUTED
 claims change an amount, a rate, a duration, a threshold, a date, a direction or a
@@ -196,10 +195,14 @@ sub-dataset; numbers are therefore not directly comparable with the full leaderb
 
 ### 3.6 Evaluation protocol
 
-Every setting is chosen on dev and never on test: the number of evidence passages
-k ∈ {1, 3, 5, 10}, the aggregation strategy and, for the main system, the temperature
-(fitted for each setting on the claim-level probabilities). Baselines go through the
-same selection with T = 1.
+Every value we report is chosen on dev: the number of evidence passages
+k ∈ {1, 3, 5, 10}, the aggregation strategy, the abstention threshold and, for the main
+system, the temperature (fitted for each setting on the claim-level probabilities).
+Baselines and the three training seeds go through the same selection with T = 1. One
+design choice was revised after looking at test numbers: an early CPU run of the
+rule-based baseline showed that fitting T on passage pairs made the test ECE worse
+(0.206 → 0.258), which is why T is now fitted on the claim-level probabilities. The
+test set was not used to tune any value after that.
 Retrieval is evaluated alone on claims that have evidence: recall@k, precision@k,
 MRR. End-to-end we report accuracy, macro-F1, a FEVER-style score (right label and at
 least one gold abstract among the evidence), and evidence-sentence F1. Calibration is
@@ -256,16 +259,22 @@ default and evaluated it across three seeds.
 
 Table 3 – End-to-end results on SciFact test (300 claims).
 
-| System | Accuracy | Macro-F1 | Time / claim |
-| --- | --- | --- | --- |
-| Majority class | 0.413 [0.360, 0.467] | 0.195 [0.176, 0.212] | – |
-| Claim only (TF-IDF + LR) | 0.437 [0.377, 0.497] | 0.401 [0.345, 0.457] | – |
-| Rules (numbers, negation, overlap) | 0.517 [0.460, 0.577] | 0.475 [0.422, 0.533] | – |
-| BM25 + zero-shot NLI | 0.580 [0.527, 0.637] | 0.570 [0.515, 0.625] | – |
-| Full retrieval + zero-shot NLI | 0.617 [0.563, 0.677] | 0.609 [0.550, 0.667] | – |
-| Full retrieval + LLM judge (Qwen2.5-7B, 4-bit) | 0.687 [0.633, 0.733] | 0.671 [0.612, 0.722] | 15.4 s (T4) |
-| **ClaimGuard, 3 seeds** | 0.701 ± 0.012 | **0.693 ± 0.010** | 0.6 s (T4), 1.0 s (CPU) |
-| ClaimGuard, main system (seed 13, T = 2.42) | 0.683 [0.633, 0.733] | 0.676 [0.620, 0.726] | 0.6 s (T4) |
+| System | Accuracy | Macro-F1 | FEVER | Ev. F1 | Time / claim |
+| --- | --- | --- | --- | --- | --- |
+| Majority class | 0.413 [0.360, 0.467] | 0.195 [0.176, 0.212] | – | – | – |
+| Claim only (TF-IDF + LR) | 0.437 [0.377, 0.497] | 0.401 [0.345, 0.457] | – | – | – |
+| Rules (numbers, negation, overlap) | 0.517 [0.460, 0.577] | 0.475 [0.422, 0.533] | 0.473 | 0.273 | – |
+| BM25 + zero-shot NLI | 0.580 [0.527, 0.637] | 0.570 [0.515, 0.625] | 0.543 | 0.253 | – |
+| Full retrieval + zero-shot NLI | 0.617 [0.563, 0.677] | 0.609 [0.550, 0.667] | 0.583 | 0.340 | – |
+| Full retrieval + LLM judge (Qwen2.5-7B, 4-bit) | 0.687 [0.633, 0.733] | 0.671 [0.612, 0.722] | 0.643 | 0.350 | 15.4 s (T4) |
+| **ClaimGuard, 3 seeds** (T = 1) | 0.701 ± 0.012 | **0.693 ± 0.012** | 0.672 ± 0.004 | 0.329 ± 0.027 | 0.6 s (T4), 1.0 s (CPU) |
+| ClaimGuard, main system (seed 13, T = 2.42) | 0.683 [0.633, 0.733] | 0.676 [0.620, 0.726] | 0.663 | 0.308 | 0.6 s (T4) |
+
+FEVER = right label and at least one gold abstract among the evidence; Ev. F1 = F1 of
+the selected evidence sentences against the gold rationales. The three seeds run with
+T = 1 and each picks its own k and aggregation on dev (seed 42 picks k = 1); the main
+system, used for calibration (Section 4.5), the ablations and the error analysis, is
+seed 13 with the temperature fitted on dev.
 
 Per class (main system): SUPPORTED F1 0.742, REFUTED 0.667, NEI 0.618.
 
@@ -273,8 +282,10 @@ The claim-only baseline reaches 0.401 macro-F1 without reading any evidence, twi
 majority class: part of the label can be guessed from the wording of the claim alone,
 as already reported for FEVER (Schuster et al., 2019). This baseline gives us a reference for how well a system can do from wording alone. Reading evidence with a
 zero-shot NLI model adds 0.21, and fine-tuning on SciFact adds another 0.08. The
-fine-tuned 184M-parameter verifier scores slightly above the 7B LLM judge in this comparison (0.693 vs 0.671; the confidence intervals overlap and we did not test the difference), while being about 26 times faster on the same GPU and able to run
-on CPU. NEI is the hardest class: it is the one where "the passage talks about the
+fine-tuned 184M-parameter verifier scores slightly above the 7B LLM judge in this comparison (0.693 vs 0.671; the confidence intervals overlap and we did not test the difference), while being about 25 times faster on the same GPU (0.63 s vs 15.4 s per claim) and
+able to run on CPU. The LLM judge selects slightly better evidence sentences (evidence
+F1 0.350 vs 0.308), and so does the zero-shot model (0.340): fine-tuning improved the
+verdicts more than the choice of evidence. NEI is the hardest class: it is the one where "the passage talks about the
 topic" must not be read as "the passage supports the claim" (Section 5).
 
 ### 4.4 Ablations (A3–A6)
@@ -289,13 +300,14 @@ Table 4 – Ablations on the main system (macro-F1 on test).
 | A5 verifier | zero-shot NLI / plain DeBERTa + SciFact / NLI + SciFact (3 seeds) | 0.609 / 0.509 / 0.693 |
 | A6 evidence | retrieved / gold (oracle) | 0.676 / 0.743 |
 
-**A2.** The reranker improves retrieval (Table 1). Individual verdicts change in both directions:
+**A2.** The reranker improves retrieval (Table 1) and the evidence F1 (0.287 → 0.308), but not the verdict. Individual verdicts change in both directions:
 McNemar b = 20, c = 21, p = 1.0. Moving a relevant abstract into the top 5 can improve retrieval even if the selected sentences still leave the decisive detail out. The paired counts show that gains and losses nearly cancel.
 **A3.** k barely matters between 1 and 5 (Figure A1 in the appendix); k = 10 loses a
 little because more neutral passages enter the aggregation. k = 3 was chosen on dev.
-**A4.** This is the largest effect of the study. The majority baseline scores
-0.369, because several neutral passages can outweigh a passage that clearly supports or refutes the claim. Noisy-OR pools evidence for support and refutation across passages, so a single decisive passage can carry substantial weight (noisy-OR vs majority: b = 106, c = 37, p < 0.0001; noisy-OR vs
-max-confidence: p = 1.0).
+**A4.** This is the largest effect of the study, and the lesson is not to average the
+passages rather than to use noisy-OR in particular. The majority strategy, which
+averages the passage probabilities, scores 0.369, because several neutral passages can outweigh a passage that clearly supports or refutes the claim. Noisy-OR pools evidence for support and refutation across passages, so a single decisive passage can carry substantial weight (noisy-OR vs majority: b = 106, c = 37, p < 0.0001; noisy-OR vs
+max-confidence: p = 1.0). Max-confidence, which simply trusts the most decisive passage, does as well as noisy-OR (0.681 vs 0.676).
 **A5.** Starting from an NLI checkpoint is essential: the same architecture
 fine-tuned from plain DeBERTa-v3-base gets 0.509, below the zero-shot NLI model.
 With only 687 SciFact training claims, the verifier benefits from prior training on entailment and contradiction.
@@ -306,7 +318,8 @@ net gain of 19 (McNemar p = 0.0005), and macro-F1 rises to 0.743. Providing gold
 
 The raw model is over-confident: before scaling, ECE is 0.260. Temperature scaling
 with T = 2.42 (fitted on dev, at the claim level) reduces it by 46% to 0.141
-(Figure 1, left). The area under the risk–coverage curve (AURC) rises from 0.142 to 0.153. Lower is better: this measure tracks errors among the claims retained as the confidence threshold varies. Scaling before noisy-OR can change the confidence ranking even as calibration improves.
+(Figure 1, left). The area under the risk–coverage curve (AURC) rises from 0.142 to 0.153. Lower is better: this measure tracks errors among the claims retained as the confidence threshold varies. Scaling before noisy-OR can change the confidence ranking even as calibration improves,
+so the gain from temperature scaling is partial.
 
 
 ![Figure 1 – Reliability diagram before and after temperature scaling (left) and risk-coverage curve (right), SciFact test.](../results/figures/calibration.png){width=80%}
@@ -320,6 +333,12 @@ Table 5 – Abstention after temperature scaling. An alert is a REFUTED or NEI v
 | 0.7 | 0.823 | 0.753 | 0.876 | 0.642 |
 | 0.8 | 0.697 | 0.794 | 0.905 | 0.540 |
 | 0.9 | 0.363 | 0.881 | 0.935 | 0.165 |
+
+The threshold chosen on dev (0.5, the smallest value that reached an alert precision of
+0.9 on dev) does not transfer: on test it gives an alert precision of 0.850 and still
+answers 98% of the claims, so abstention is almost inactive at that point. The rows
+above 0.5 are read on test and are only indicative operating points; the 0.905 at 0.8
+rests on 105 alerts.
 
 Macro-F1 in Tables 3–4 is always computed on the model's best guess; UNCERTAIN
 answers only appear here. The threshold of 0.5 chosen on dev answers 98% of the
@@ -357,8 +376,9 @@ Table 7 – Verifier given the evidence, other test sets.
 | French banking (60) | macro-F1 | **0.949** [0.885, 1.000] | 0.934 [0.866, 0.985] (multilingual) | 0.765 [0.653, 0.868] |
 
 On Climate-FEVER, a new domain with noisier evidence, the fine-tuned verifier keeps a
-clear lead over the zero-shot model (+0.12) and stays much better calibrated (ECE
-0.113 vs 0.434). On our French banking set, the English verifier gets 57 of 60 right,
+clear lead over the zero-shot model (+0.12) and is much better calibrated than it (ECE
+0.113 vs 0.434), although the rules, which are rarely confident, have the lowest ECE
+(0.063). On our French banking set, the English verifier gets 57 of 60 right,
 slightly above the multilingual NLI model (56 of 60). Its 3 errors are all
 "missing information" claims, the hardest category for both models (17 of 20). The set is small and we wrote it
 ourselves, so this only shows that the pipeline is usable on French text, not that it
@@ -488,7 +508,7 @@ evidence" to statins instead of to the other drugs.
 
 ## 6. Discussion
 
-**What worked.** The biggest improvement came from how we combined the passages. Our majority baseline averages the probabilities across passages. Two passages that say very little can outweigh the one that actually answers the question. With noisy-OR, that one passage can still decide the verdict. Macro-F1 went from 0.369 to 0.676. Starting from an NLI model helped too. It had already learned to recognise when a passage supports or contradicts a claim. After fine-tuning on SciFact, it scored 0.693, compared with 0.509 when we started from plain DeBERTa.
+**What worked.** The biggest improvement came from not averaging the passages. Our majority baseline averages the probabilities across passages. Two passages that say very little can outweigh the one that actually answers the question. With noisy-OR or max-confidence, that one passage can still decide the verdict. Macro-F1 went from 0.369 to 0.676 with noisy-OR and 0.681 with max-confidence. Starting from an NLI model helped too. It had already learned to recognise when a passage supports or contradicts a claim. After fine-tuning on SciFact, it scored 0.693, compared with 0.509 when we started from plain DeBERTa.
 
 **What surprised us.** We expected better retrieval to lead to better answers. The reranker did find more of the right abstracts near the top, but the final macro-F1 was 0.676 either way. Even with the right abstract, the model still has to pick the sentence that answers the question. What surprised us most was how often a small edit slipped through. The model missed 14 of the 20 number changes in the contrast set. Change a rate from 4.35% to 3.45% and almost every word stays the same, even though the verdict should change. Confidence alone wouldn't solve the problem either. Across the 110 annotated errors, 44 had a confidence score of at least 0.8.
 
@@ -503,11 +523,11 @@ negatives used in training and some "false" positives at test time may be real
 evidence. (4) English training data only; the French set is small and synthetic.
 (5) Sentences are checked one by one without resolving pronouns, and claims that need
 two documents together are not handled. (6) The contrast set labels come from rules. (7) The error categories were first assigned with AI assistance, and both passes took place on the same day. This limits what their agreement tells us about how consistently someone else could apply the categories.
-(8) Long documents with tables are out of scope.
+(8) Long documents with tables are out of scope. (9) Our dev split is random by claim, not by document, and it is easier than the test set (macro-F1 about 0.83 on dev against 0.68 on test), so the values tuned on dev, the threshold above all, are optimistic.
 
 ## 7. Conclusion and Future Work
 
-Three things stuck with us from building ClaimGuard. A small model trained on a similar task came close to the 7B judge on SciFact and ran about 26 times faster on the same GPU. Changing a single number showed us a weakness we'd have missed if we'd only looked at the overall score. And the feature we'd most want as users is being able to click on a verdict and read the sentence behind it, especially when the model sounds sure of itself.
+Three things stuck with us from building ClaimGuard. A small model trained on a similar task came close to the 7B judge on SciFact and ran about 25 times faster on the same GPU. Changing a single number showed us a weakness we'd have missed if we'd only looked at the overall score. And the feature we'd most want as users is being able to click on a verdict and read the sentence behind it, especially when the model sounds sure of itself.
 
 We'd start by checking confidence separately for different kinds of claims. An analyst might handle a flagged interest rate differently from a flagged product description. With more labelled examples, we'd also test whether a model can learn to combine passages better than noisy-OR. A small LLM could help split longer answers into claims, and HoVer would let us test cases where the evidence comes from two documents. We'd compare ClaimGuard with MiniCheck on the full LLM-AggreFact benchmark. For the demo, we'd add the option to run the verifier automatically after each assistant answer.
 
