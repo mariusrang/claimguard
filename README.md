@@ -211,12 +211,15 @@ answers are evaluated separately (coverage and selective accuracy, below).
 
 **Key findings**
 
-1. *Fine-tuning a 184M encoder matches a 7B LLM judge* (0.693 vs 0.671 macro-F1). On
+1. *A fine-tuned 184M encoder does as well as a 7B LLM judge* (0.693 vs 0.671
+   macro-F1; the confidence intervals overlap and the difference was not tested). On
    the same T4, ClaimGuard takes 0.6 s per claim versus 15.4 s for the LLM judge, about
    26× faster. ClaimGuard also runs on CPU at 1.0 s per claim, with no API.
-2. *Aggregation matters more than retrieval tricks.* A hard majority vote over passages
-   collapses to 0.369 macro-F1 (most passages are neutral, so NEI wins the vote);
-   noisy-OR and max-confidence get 0.676 / 0.681 (McNemar p < 0.0001). The reranker
+2. *Aggregation matters more than retrieval tricks.* The "majority" baseline, which
+   averages the probabilities of the passages, collapses to 0.369 macro-F1: several
+   neutral passages outweigh the one passage that supports or refutes. Noisy-OR and
+   max-confidence let one decisive passage count and get 0.676 / 0.681 (noisy-OR vs
+   majority, McNemar p < 0.0001). The reranker
    improves retrieval but changes nothing end to end (p = 1.0).
 3. *Most errors are not retrieval failures.* Giving the verifier the gold evidence
    fixes 24 of the 95 errors but creates 5 new ones, a net drop of 19 errors

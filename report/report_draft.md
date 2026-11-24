@@ -278,7 +278,7 @@ The claim-only baseline reaches 0.401 macro-F1 without reading any evidence, twi
 majority class: part of the label can be guessed from the wording of the claim alone,
 as already reported for FEVER (Schuster et al., 2019). This baseline gives us a reference for how well a system can do from wording alone. Reading evidence with a
 zero-shot NLI model adds 0.21, and fine-tuning on SciFact adds another 0.08. The
-fine-tuned 184M-parameter verifier scores slightly above the 7B LLM judge in this comparison (0.693 vs 0.671), while being about 26 times faster on the same GPU and able to run
+fine-tuned 184M-parameter verifier scores slightly above the 7B LLM judge in this comparison (0.693 vs 0.671; the confidence intervals overlap and we did not test the difference), while being about 26 times faster on the same GPU and able to run
 on CPU. NEI is the hardest class: it is the one where "the passage talks about the
 topic" must not be read as "the passage supports the claim" (Section 5).
 
