@@ -239,7 +239,7 @@ where claims reuse the technical words of the abstract. The dense encoder finds 
 of the gold abstracts in the top 20 (0.979), and the cross-encoder turns this into a
 better top 5: dense + rerank gains +0.076 R@5 over BM25 (paired permutation test,
 p = 0.0007). Hybrid fusion alone is close to dense alone (+0.052 vs +0.039 over BM25),
-and once the reranker is applied dense and hybrid end at the same R@5 (0.935 vs
+and once the reranker is applied dense and hybrid reach nearly the same R@5 (0.935 vs
 0.934). The reranker adds more than the choice between dense and hybrid.
 
 ### 4.2 Hyperparameter search
@@ -254,8 +254,8 @@ Table 2 – Dev macro-F1 of the verifier (gold evidence), batch size 16, one see
 
 Batch size 32 was planned but did not fit in the T4 memory in float32. All six runs
 are within 0.034 of each other, and the best one (5e-5, 3 epochs) is only 0.003 above
-our default (2e-5, 5 epochs), less than the seed-to-seed variation. We kept the
-default for the three seeds so the test numbers do not depend on one lucky grid point.
+our default (2e-5, 5 epochs), a small difference in a single-seed search. We kept the
+default and evaluated it across three seeds.
 
 ### 4.3 Main results and baselines
 
@@ -276,11 +276,9 @@ Per class (main system): SUPPORTED F1 0.742, REFUTED 0.667, NEI 0.618.
 
 The claim-only baseline reaches 0.401 macro-F1 without reading any evidence, twice the
 majority class: part of the label can be guessed from the wording of the claim alone,
-as already reported for FEVER (Schuster et al., 2019). Every system that reads
-evidence has to beat this number to show it uses the evidence. Reading evidence with a
+as already reported for FEVER (Schuster et al., 2019). This baseline gives us a reference for how well a system can do from wording alone. Reading evidence with a
 zero-shot NLI model adds 0.21, and fine-tuning on SciFact adds another 0.08. The
-fine-tuned 184M-parameter verifier is level with the 7B LLM judge (0.693 vs 0.671, the
-intervals overlap), while being about 26 times faster on the same GPU and able to run
+fine-tuned 184M-parameter verifier scores slightly above the 7B LLM judge in this comparison (0.693 vs 0.671), while being about 26 times faster on the same GPU and able to run
 on CPU. NEI is the hardest class: it is the one where "the passage talks about the
 topic" must not be read as "the passage supports the claim" (Section 5).
 
@@ -296,31 +294,24 @@ Table 4 – Ablations on the main system (macro-F1 on test).
 | A5 verifier | zero-shot NLI / plain DeBERTa + SciFact / NLI + SciFact (3 seeds) | 0.609 / 0.509 / 0.693 |
 | A6 evidence | retrieved / gold (oracle) | 0.676 / 0.743 |
 
-**A2.** The reranker improves retrieval (Table 1) but not the final verdict:
-McNemar b = 20, c = 21, p = 1.0. A likely reason is that the documents the reranker
-moves into the top 5 were often already among the passages the verifier reads.
+**A2.** The reranker improves retrieval (Table 1). Individual verdicts change in both directions:
+McNemar b = 20, c = 21, p = 1.0. Moving a relevant abstract into the top 5 can improve retrieval even if the selected sentences still leave the decisive detail out. The paired counts show that gains and losses nearly cancel.
 **A3.** k barely matters between 1 and 5 (Figure `ablation_k.png`); k = 10 loses a
 little because more neutral passages enter the aggregation. k = 3 was chosen on dev.
-**A4.** This is the largest effect of the study. A hard majority vote collapses to
-0.369, because most passages of a claim are neutral, so NEI wins the vote even when
-one passage clearly supports or refutes. Noisy-OR and max-confidence let one strong
-passage decide (noisy-OR vs majority: b = 106, c = 37, p < 0.0001; noisy-OR vs
+**A4.** This is the largest effect of the study. The majority baseline scores
+0.369, because several neutral passages can outweigh a passage that clearly supports or refutes the claim. Noisy-OR pools evidence for support and refutation across passages, so a single decisive passage can carry substantial weight (noisy-OR vs majority: b = 106, c = 37, p < 0.0001; noisy-OR vs
 max-confidence: p = 1.0).
 **A5.** Starting from an NLI checkpoint is essential: the same architecture
 fine-tuned from plain DeBERTa-v3-base gets 0.509, below the zero-shot NLI model.
-SciFact alone (687 training claims) is too small to learn the task from scratch.
+With only 687 SciFact training claims, the verifier benefits from prior training on entailment and contradiction.
 **A6.** With gold evidence, 24 of the 95 errors are fixed but 5 new ones appear, a
-net gain of 19 (McNemar p = 0.0005), and macro-F1 rises to 0.743. Retrieval is
-therefore responsible for some errors, but most of them remain with perfect
-evidence: the verifier is the main bottleneck.
+net gain of 19 (McNemar p = 0.0005), and macro-F1 rises to 0.743. Providing gold evidence helps, but most original errors persist. Better retrieval alone would leave many verdicts unresolved.
 
 ### 4.5 Calibration and abstention
 
 The raw model is over-confident: before scaling, ECE is 0.260. Temperature scaling
 with T = 2.42 (fitted on dev, at the claim level) reduces it by 46% to 0.141
-(Figure `reliability.png`). The AURC moves from 0.142 to 0.153: temperature changes
-the noisy-OR aggregation, so it can change the ranking of the claims and not only
-their confidence.
+(Figure `reliability.png`). The area under the risk–coverage curve (AURC) rises from 0.142 to 0.153. Lower is better: this measure tracks errors among the claims retained as the confidence threshold varies. Scaling before noisy-OR can change the confidence ranking even as calibration improves.
 
 Table 5 – Abstention after temperature scaling. An alert is a REFUTED or NEI verdict.
 
@@ -352,13 +343,12 @@ negation or a direction word). "Detected" = the edited claim is no longer predic
 | Originals predicted SUPPORTED | | **0.87** | 0.47 | 0.35 |
 | Consistency (original right and edit detected) | | **0.728** | 0.424 | 0.248 |
 
-The fine-tuned model is the only one that both accepts the original claims and
-reacts to the edits, hence the much higher consistency. The zero-shot model and the
+The fine-tuned model most often gets both parts of a pair right: it accepts the original claim and flags the edit. The zero-shot model and the
 rules look good on "detected" only because they reject most claims anyway (they keep
 fewer than half of the unedited originals). The clear weakness is numbers: the
 fine-tuned verifier misses 70% of changed numbers, so "a rate of 4.35%" and "a rate
 of 3.45%" look almost identical to it. Fine-tuning made this worse than the
-zero-shot model (0.30 vs 0.70): SciFact rarely hinges on an exact number.
+zero-shot model (0.30 vs 0.70): one possible explanation is that the SciFact training examples provide limited practice with changes to a single value.
 
 Table 7 – Verifier given the evidence, other test sets.
 
@@ -400,7 +390,7 @@ picture depends on the kind of text: the fine-tuned model is better on the RAG a
 long-form QA sets (Lfqa, RAGTruth, Reveal, ClaimVerify), where a sentence is checked
 against retrieved passages as in SciFact, and worse on summaries of news and of
 dialogues (AggreFact-CNN −0.16, TofuEval-MediaS −0.05). With 100 claims per
-sub-dataset, differences of a few points are within noise.
+sub-dataset, small differences should be interpreted cautiously.
 
 ### 4.8 Efficiency
 
@@ -414,7 +404,7 @@ on 209 pairs.
 | INT8 dynamic, feed-forward only | 568 MB | 949 ms | 996 ms | 0.455 |
 
 On GPU the full pipeline takes 627 ms per claim (p50; p95 790 ms). Dynamic INT8
-quantization saves 35% of the size but only 11% of the time, and destroys accuracy,
+quantization saves 35% of the size but only 11% of median CPU inference time. Accuracy drops sharply,
 even when the attention layers are kept in FP32. We kept FP32: at about one second
 per claim on CPU, the demo is usable without a GPU.
 
@@ -427,9 +417,7 @@ claim has gold evidence and none of it reached the verifier) or *verification
 error*, presence of a number, presence of a negation. Then each error receives one
 category (taxonomy in Table 10), with a short note justifying it. The annotation was
 done with the help of an AI assistant; the categories and notes were then reviewed.
-To check the consistency of the categories, 25 errors were annotated a second time
-one week later without the assistant and without seeing the first labels:
-agreement [[TODO]], Cohen's κ = [[TODO]].
+The planned consistency check covers 25 errors: repeat the annotation one week later without AI assistance or access to the first labels. Report agreement [[TODO]] and Cohen's κ [[TODO]] once the paired labels are available.
 
 ### 5.1 Quantitative breakdown
 
@@ -451,16 +439,14 @@ Figure `errors.png` shows the same counts. Three numbers stand out.
 
 * **Errors are made with confidence.** 44 of the 110 errors have a confidence of at
   least 0.8 (mean 0.728 over the 110, 0.746 over the 95 SciFact errors). A threshold
-  can filter the hesitant errors, not these ones.
+  set at that level would still let these errors through.
 * **The most frequent confusion is NEI → SUPPORTED** (39 of 110). On SciFact, NEI
   claims have the highest error rate (48 of 112, 43%), against 34% for REFUTED (22 of
   64) and 20% for SUPPORTED (25 of 124).
 * **Numbers and negations are not where SciFact errors are.** Claims with a number
   have an error rate of 29% (33 of 114) against 33% for the others (62 of 186); claims
   with a negation 24% (7 of 29) against 33%. This looks like it contradicts the
-  contrast set, but it does not: SciFact claims that contain a number rarely depend
-  on its exact value ("1,000 Genomes project", "1/2000 in the UK"), whereas the
-  contrast set is built so that the number is the only thing that changes.
+  contrast set, but it does not: the number flag groups project names ("1,000 Genomes project") with genuine prevalence claims ("1/2000 in the UK"). The contrast set isolates a different question: does the verdict change when only the value changes?
 
 ### 5.2 Qualitative analysis
 
@@ -485,10 +471,7 @@ passage, not that the specific link the claim asserts is established.
 
 **REFUTED vs NEI.** Claim 213, *"CRP is not predictive of postoperative mortality
 following CABG surgery"* (gold NEI, predicted REFUTED, 0.92). The abstract links CRP
-to long-term mortality after bypass surgery; the claim is about the postoperative
-period, which the abstract does not measure. The model reads "associated with
-mortality" as a contradiction of "not predictive of mortality" without checking the
-time frame.
+to long-term mortality after bypass surgery; the claim leaves the postoperative time horizon unspecified. An association over long-term follow-up does not by itself settle the prediction question as worded.
 
 **Domain vocabulary.** The pair of claims 268 and 269 is telling: *"Cold exposure
 increases BAT recruitment"* is predicted SUPPORTED (0.82) and *"Cold exposure reduces
@@ -496,7 +479,7 @@ BAT recruitment"* is predicted REFUTED (0.82), while both are NEI (the second on
 counted under REFUTED vs NEI). The abstract says
 that cold makes brown adipose tissue express Ucp1, a thermogenic response, but never
 measures recruitment of the tissue. The model treats "express Ucp1" and "recruit BAT"
-as the same thing, which a biologist would not.
+as interchangeable, although the passage measures only the former.
 
 **Negation scope.** Claim 1290, *"There is an inverse relationship between hip
 fractures and statin use"* (gold SUPPORTED, predicted REFUTED, 0.91). The abstract
@@ -511,9 +494,7 @@ evidence" to statins instead of to the other drugs.
    pattern. *Fix:* add hard negatives built from the gold abstract itself (sentences of
    the right abstract that do not support the claim, labelled NEI) so that the model
    learns that the right topic is not enough.
-2. **Sentence selection is the first bottleneck after the verifier** (32 errors), and
-   it is not solved by a better retriever (the reranker did not change the end-to-end
-   score). *Fix:* select sentences with the verifier's own scores, or give the
+2. **Wrong sentence selection is the most frequent annotated category** (32 errors), while reranking documents left the end-to-end score unchanged in this experiment. *Fix:* select sentences with the verifier's own scores, or give the
    verifier the whole abstract when it fits in 512 tokens.
 3. **Confidence does not separate these errors.** 40% of them are made with at least
    0.8 confidence, so abstention protects against hesitant errors only. *Fix:* report
@@ -525,8 +506,7 @@ evidence" to statins instead of to the other drugs.
    numbers of the claim and of the decisive sentence before the verifier, as in our
    lexical baseline, which flags 100% of number edits (it also rejects many true
    claims, so it should only send a warning, not decide alone).
-5. **Some labels are debatable** (5 of 110). This is small, but with 300 test claims
-   it is of the same order as the gap between two systems in Table 3.
+5. **Some labels are debatable** (5 of 110). On a test set of 300 claims, a few disputed decisions warrant a closer look when comparing nearby scores in Table 3.
 
 ## 6. Discussion
 
