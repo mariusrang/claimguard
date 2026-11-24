@@ -12,6 +12,7 @@ from typing import Protocol
 
 
 class Retriever(Protocol):
+    """Anything with a search(query, k) method returning (doc_id, score) pairs."""
     def search(self, query: str, k: int = 10) -> list[tuple[str, float]]: ...
 
 

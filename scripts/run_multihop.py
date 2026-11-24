@@ -50,6 +50,7 @@ def binary_scores(gold: np.ndarray, pred: np.ndarray) -> dict:
 
 
 def by_hops(claims, gold, pred) -> dict:
+    """Scores on all claims and separately for 2, 3 and 4 hops."""
     hops = np.array([c.num_hops for c in claims])
     out = {"all": binary_scores(gold, pred)}
     for h in sorted(set(hops.tolist())):
@@ -65,6 +66,7 @@ def load_tfidf(path: Path, uids: set[str]) -> dict[str, list[str]]:
 
 
 def load_wiki(args, titles: set[str]) -> WikiTexts:
+    """SQLite dump if the path ends in .db, else the BEIR corpus file."""
     if args.wiki.endswith(".db"):
         return WikiTexts.from_sqlite(args.wiki, titles)
     return WikiTexts.from_beir(args.wiki, titles)
@@ -94,6 +96,7 @@ def run_readers(verifier, claims, docs_of, tag: str) -> dict:
 
 
 def main() -> None:
+    """Run E1, E3, E2 and E2b and save results/multihop.json and the figure."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--hover-dir", default="data/raw/hover")
     ap.add_argument("--wiki", required=True, help="wiki_wo_links.db or BEIR hotpotqa corpus.jsonl(.gz)")
@@ -169,6 +172,7 @@ def main() -> None:
     gold_docs = lambda c: [(t, wiki.get(t)) for t in c.gold_titles]  # noqa: E731
 
     def with_distractors(c):
+        """Gold articles plus 3 TF-IDF candidates that are not gold, in a random order."""
         extra = [t for t in tfidf.get(c.uid, []) if t not in c.gold_titles and t in wiki][:3]
         docs = gold_docs(c) + [(t, wiki.get(t)) for t in extra]
         np.random.default_rng(zlib.crc32(c.uid.encode())).shuffle(docs)  # gold must not always come first

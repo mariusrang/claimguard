@@ -81,6 +81,7 @@ def apply_overrides(cfg: dict, args: argparse.Namespace) -> dict:
 
 
 def out_path(args: argparse.Namespace, name: str) -> Path:
+    """results/<name><tag>.json, so that variants (zero-shot, lexical...) never overwrite each other."""
     tag = f"_{args.tag}" if args.tag else ""
     return Path(args.out) / f"{name}{tag}.json"
 
@@ -151,6 +152,7 @@ def score(records: list[dict], k: int, strategy: str, temperature: float = 1.0) 
 
 
 def main_metrics(records: list[dict], k: int, strategy: str, temperature: float = 1.0) -> dict:
+    """Accuracy, macro-F1 with bootstrap CIs, FEVER score and evidence F1 for one (k, aggregation, T)."""
     s = score(records, k, strategy, temperature)
     pred, gold = s["pred"], s["gold"]
     # evidence sentences we "claim": sentences of the docs that the verifier found decisive
@@ -236,6 +238,7 @@ def load_calibration_file(cfg: dict) -> dict:
 
 
 def cmd_retrieval(args: argparse.Namespace) -> None:
+    """A1: recall@k, precision@k and MRR of each retriever, with paired permutation tests."""
     cfg = load_config(args.config)
     corpus, claims = load_scifact(cfg["data"]["dir"], args.split)
     claims = [c for c in claims if c.evidence][: args.limit]  # NEI claims have nothing to retrieve
@@ -280,6 +283,7 @@ def cmd_retrieval(args: argparse.Namespace) -> None:
 
 
 def cmd_pipeline(args: argparse.Namespace) -> None:
+    """End to end on SciFact test: settings chosen on dev, ablations A2-A6, McNemar tests."""
     cfg = apply_overrides(load_config(args.config), args)
     set_seed(cfg.get("seed", 13))
     pipeline = build_pipeline(cfg)
@@ -412,6 +416,7 @@ def cmd_calibration(args: argparse.Namespace) -> None:
 
 
 def load_given(args: argparse.Namespace, cfg: dict) -> tuple[list[EvidenceClaim], str]:
+    """Claims with their evidence already given (Climate-FEVER, contrast set, French set)."""
     if args.dataset == "french":
         return load_evidence_claims(args.path or "data/french_bank/fr_bank_claims.jsonl"), "category"
     if args.dataset == "climate":
@@ -422,6 +427,7 @@ def load_given(args: argparse.Namespace, cfg: dict) -> tuple[list[EvidenceClaim]
 
 
 def cmd_given(args: argparse.Namespace) -> None:
+    """Verifier alone on given evidence: macro-F1, ECE and per-example predictions."""
     cfg = apply_overrides(load_config(args.config), args)
     pipeline = build_pipeline(cfg, with_corpus=False)
     examples, group_key = load_given(args, cfg)
@@ -523,6 +529,7 @@ def cmd_baselines(args: argparse.Namespace) -> None:
 
 
 def cmd_efficiency(args: argparse.Namespace) -> None:
+    """CPU latency (p50/p95), model size and gold-evidence accuracy of FP32 and INT8 versions."""
     from claimguard.efficiency import benchmark, count_parameters, model_size_mb, quantize_dynamic_int8
     from claimguard.verify.nli import NLIVerifier
 
@@ -637,6 +644,7 @@ def cmd_aggrefact(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    """Command line entry point: one sub-command per experiment."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     commands = {

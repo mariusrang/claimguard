@@ -80,14 +80,22 @@ Dense retrieval with bi-encoders (Karpukhin et al., 2020) matches meaning instea
 words; general-purpose embedding models such as BGE (Xiao et al., 2023) now work well
 without task-specific training. Lexical and dense rankings fail on different queries,
 and Reciprocal Rank Fusion (Cormack et al., 2009) combines them using ranks only.
-Cross-encoders (Nogueira and Cho, 2019) read the query and the passage together and
-are the usual second stage.
+Cross-encoders (Nogueira and Cho, 2019), usually trained on MS MARCO (Nguyen et al.,
+2016), read the query and the passage together and are the usual second stage.
 
 **Verification.** Verification is close to natural language inference, and models
-pre-trained on NLI data transfer well (Laurer et al., 2024). DeBERTa-v3 (He et al.,
+pre-trained on NLI data such as MultiNLI (Williams et al., 2018) and ANLI (Nie et al.,
+2020) transfer well (Laurer et al., 2024). DeBERTa-v3 (He et al.,
 2023) is a strong encoder for this kind of sentence-pair task. On SciFact, MultiVerS
 (Wadden et al., 2022) predicts the label and the rationales jointly from the full
 abstract and uses weak supervision from other datasets.
+
+**Multi-hop verification.** Some claims can only be checked by combining several
+documents. HotpotQA (Yang et al., 2018) introduced multi-hop questions over Wikipedia,
+and HoVer (Jiang et al., 2020) turned them into claims that need 2 to 4 articles,
+showing that models which match the claim with one passage at a time degrade as the
+number of hops grows. Multi-hop dense retrieval (Xiong et al., 2021) retrieves
+iteratively, using the passages found in one round to build the next query.
 
 **Checking LLM outputs.** FActScore (Min et al., 2023) splits a generated text into
 atomic facts and checks each one. SummaC (Laban et al., 2022) revisited NLI models
@@ -159,10 +167,8 @@ alert precision of 0.9 on dev.
 
 ### 3.3 Baselines
 
-(1) Majority class. (2) Claim-only: TF-IDF and logistic regression on the claim text,
-no evidence. (3) Lexical rules: word overlap, number mismatch and negation mismatch.
-(4) Minimal system: BM25, no reranker, the NLI checkpoint without fine-tuning.
-(5) LLM judge: an open-source instruction model (Qwen2.5-7B, 4-bit) reads the same
+We compare with five baselines: (1) majority class. (2) Claim-only: TF-IDF and logistic regression on the claim text,
+no evidence. (3) Lexical rules: word overlap, number mismatch and negation mismatch. (4) Minimal system: BM25, no reranker, the NLI checkpoint without fine-tuning. (5) LLM judge: an open-source instruction model (Qwen2.5-7B, Qwen Team, 2024; 4-bit) reads the same
 evidence and answers with one letter; we read the logits of the three letters.
 
 ### 3.4 Stress tests
@@ -212,6 +218,26 @@ has a 95% bootstrap interval (1,000 resamples); systems are compared with McNema
 exact test, retrievers with a paired permutation test on recall@5. We report raw
 p-values for 9 comparisons (4 McNemar tests, 5 permutation tests) and read them with that in mind.
 
+### 3.7 Multi-hop extension
+
+ClaimGuard reads each passage on its own and combines the scores, which cannot work
+when no single document proves the claim ("the director of film X was born in Y"
+needs the article on X and the article on its director). We add two components and
+test them on HoVer (Jiang et al., 2020). (i) A *joint reader*: all the evidence
+documents are concatenated into one premise, each document getting the same share of
+the 512-token window, and the verifier reads them together. (ii) An *iterative
+retriever*: after a first BM25 + cross-encoder round, the title and first sentence of
+the two best articles are added to the claim to search again, which can reach the
+"bridge" articles that share no words with the claim. HoVer labels are SUPPORTED /
+NOT_SUPPORTED, so our verifier is read as binary (SUPPORTED if it is the most probable
+class). We sample 600 dev claims, 100 for each number of hops (2, 3, 4) and label;
+HoVer test labels are not public, so this dev sample is our test set and nothing is
+tuned on it. The retrieval pool is the union of the 100 TF-IDF candidates released
+with HoVer for each claim and the gold articles. We compare three readers: the
+zero-shot NLI model, our SciFact verifier, and a joint reader fine-tuned from it on
+4,200 HoVer training claims (2 epochs, validation on held-out training claims),
+where NOT_SUPPORTED is mapped to NOT ENOUGH INFO.
+
 ## 4. Experiments
 
 All experiments ran on a free Kaggle T4 GPU (16 GB) in three unattended sessions;
@@ -242,13 +268,7 @@ and once the reranker is applied dense and hybrid reach nearly the same R@5 (0.9
 
 ### 4.2 Hyperparameter search
 
-Table 2 – Dev macro-F1 of the verifier (gold evidence), batch size 16, one seed.
-
-| Learning rate | 3 epochs | 5 epochs |
-| --- | --- | --- |
-| 1e-5 | 0.824 | 0.842 |
-| 2e-5 | 0.829 | 0.855 |
-| 5e-5 | **0.858** | 0.855 |
+Table A3 in the appendix gives the dev macro-F1 of the six settings (batch size 16, one seed each).
 
 Batch size 32 was planned but did not fit in the T4 memory in float32. All six runs
 are within 0.034 of each other, and the best one (5e-5, 3 epochs) is only 0.003 above
@@ -257,18 +277,18 @@ default and evaluated it across three seeds.
 
 ### 4.3 Main results and baselines
 
-Table 3 – End-to-end results on SciFact test (300 claims).
+Table 2 – End-to-end results on SciFact test (300 claims); brackets: 95% bootstrap interval.
 
 | System | Accuracy | Macro-F1 | FEVER | Ev. F1 | Time / claim |
 | --- | --- | --- | --- | --- | --- |
-| Majority class | 0.413 [0.360, 0.467] | 0.195 [0.176, 0.212] | – | – | – |
-| Claim only (TF-IDF + LR) | 0.437 [0.377, 0.497] | 0.401 [0.345, 0.457] | – | – | – |
-| Rules (numbers, negation, overlap) | 0.517 [0.460, 0.577] | 0.475 [0.422, 0.533] | 0.473 | 0.273 | – |
-| BM25 + zero-shot NLI | 0.580 [0.527, 0.637] | 0.570 [0.515, 0.625] | 0.543 | 0.253 | – |
-| Full retrieval + zero-shot NLI | 0.617 [0.563, 0.677] | 0.609 [0.550, 0.667] | 0.583 | 0.340 | – |
-| Full retrieval + LLM judge (Qwen2.5-7B, 4-bit) | 0.687 [0.633, 0.733] | 0.671 [0.612, 0.722] | 0.643 | 0.350 | 15.4 s (T4) |
+| Majority class | 0.413 | 0.195 [0.176, 0.212] | – | – | – |
+| Claim only (TF-IDF + LR) | 0.437 | 0.401 [0.345, 0.457] | – | – | – |
+| Rules (numbers, negation, overlap) | 0.517 | 0.475 [0.422, 0.533] | 0.473 | 0.273 | – |
+| BM25 + zero-shot NLI | 0.580 | 0.570 [0.515, 0.625] | 0.543 | 0.253 | – |
+| Full retrieval + zero-shot NLI | 0.617 | 0.609 [0.550, 0.667] | 0.583 | 0.340 | – |
+| Full retrieval + LLM judge (Qwen2.5-7B, 4-bit) | 0.687 | 0.671 [0.612, 0.722] | 0.643 | 0.350 | 15.4 s (T4) |
 | **ClaimGuard, 3 seeds** (T = 1) | 0.701 ± 0.012 | **0.693 ± 0.012** | 0.672 ± 0.004 | 0.329 ± 0.027 | 0.6 s (T4), 1.0 s (CPU) |
-| ClaimGuard, main system (seed 13, T = 2.42) | 0.683 [0.633, 0.733] | 0.676 [0.620, 0.726] | 0.663 | 0.308 | 0.6 s (T4) |
+| ClaimGuard, main system (seed 13, T = 2.42) | 0.683 | 0.676 [0.620, 0.726] | 0.663 | 0.308 | 0.6 s (T4) |
 
 FEVER = right label and at least one gold abstract among the evidence; Ev. F1 = F1 of
 the selected evidence sentences against the gold rationales. The three seeds run with
@@ -290,7 +310,7 @@ topic" must not be read as "the passage supports the claim" (Section 5).
 
 ### 4.4 Ablations (A3–A6)
 
-Table 4 – Ablations on the main system (macro-F1 on test).
+Table 3 – Ablations on the main system (macro-F1 on test).
 
 | Ablation | Setting | Macro-F1 |
 | --- | --- | --- |
@@ -324,7 +344,7 @@ so the gain from temperature scaling is partial.
 
 ![Figure 1 – Reliability diagram before and after temperature scaling (left) and risk-coverage curve (right), SciFact test.](../results/figures/calibration.png){width=80%}
 
-Table 5 – Abstention after temperature scaling. An alert is a REFUTED or NEI verdict.
+Table 4 – Abstention after temperature scaling. An alert is a REFUTED or NEI verdict.
 
 | Threshold | Coverage | Selective accuracy | Alert precision | Alert recall |
 | --- | --- | --- | --- | --- |
@@ -348,7 +368,7 @@ keep 70% coverage, at the cost of missing about half of the problems (alert reca
 
 ### 4.6 Stress tests
 
-Table 6 – Contrast set (125 edited claims generated from the 124 SUPPORTED test
+Table 5 – Contrast set (125 edited claims generated from the 124 SUPPORTED test
 claims, gold evidence given; a rule only applies when the claim has a number, a
 negation or a direction word). "Detected" = the edited claim is no longer predicted SUPPORTED.
 
@@ -367,7 +387,7 @@ fine-tuned verifier misses 70% of changed numbers, so "a rate of 4.35%" and "a r
 of 3.45%" look almost identical to it. Fine-tuning made this worse than the
 zero-shot model (0.30 vs 0.70): one possible explanation is that the SciFact training examples provide limited practice with changes to a single value.
 
-Table 7 – Verifier given the evidence, other test sets.
+Table 6 – Verifier given the evidence, other test sets.
 
 | Test set | Metric | Fine-tuned | Zero-shot NLI | Rules |
 | --- | --- | --- | --- | --- |
@@ -403,6 +423,13 @@ quantization saves 35% of the size but only 11% of median CPU inference time. Ac
 even when the attention layers are kept in FP32. We kept FP32: at about one second
 per claim on CPU, the demo is usable without a GPU.
 
+### 4.9 Multi-hop claims (HoVer)
+
+[[TODO run 4: Table 8 (accuracy by number of hops: one by one vs together, three
+readers, gold articles and gold + 3 distractors), Figure 3 (left: accuracy by hops,
+right: share of claims with all articles in the top 10, single vs iterative), end to
+end, McNemar joint vs independent.]]
+
 ## 5. Error Analysis
 
 **Protocol.** We export every wrong prediction of the main system on the SciFact test
@@ -410,13 +437,13 @@ set (95 errors) and add the 15 errors of a random sample of Climate-FEVER, which
 gives 110 errors. Each error is first tagged automatically: *retrieval miss* (the
 claim has gold evidence and none of it reached the verifier) or *verification
 error*, presence of a number, presence of a negation. Then each error receives one
-category (taxonomy in Table 8), with a short note justifying it. The annotation was
+category (taxonomy in Table 7), with a short note justifying it. The annotation was
 done with the help of an AI assistant; the categories and notes were then reviewed.
 To check the consistency of the categories, 25 errors drawn at random were annotated a second time by the author alone, without AI assistance and without access to the first labels, the same day a few hours after the first pass. The two passes agree on 24 of the 25 errors (96%), Cohen's κ = 0.95 (`results/kappa.json`). The only change is claim 1280, moved from domain vocabulary to related but insufficient, two categories that overlap when a technical term hides a missing link. The short delay probably inflates the agreement, so this number shows that the categories are usable, not that they are fully reliable.
 
 ### 5.1 Quantitative breakdown
 
-Table 8 – Error categories (110 errors).
+Table 7 – Error categories (110 errors).
 
 | Category | Definition | SciFact | Climate | Total | Main confusion |
 | --- | --- | --- | --- | --- | --- |
@@ -504,7 +531,7 @@ evidence" to statins instead of to the other drugs.
    numbers of the claim and of the decisive sentence before the verifier, as in our
    lexical baseline, which flags 100% of number edits (it also rejects many true
    claims, so it should only send a warning, not decide alone).
-5. **Some labels are debatable** (5 of 110). On a test set of 300 claims, a few disputed decisions warrant a closer look when comparing nearby scores in Table 3.
+5. **Some labels are debatable** (5 of 110). On a test set of 300 claims, a few disputed decisions warrant a closer look when comparing nearby scores in Table 2.
 
 ## 6. Discussion
 
@@ -520,10 +547,8 @@ evidence" to statins instead of to the other drugs.
 is SUPPORTED. (2) The test set has 300 claims, so intervals are wide and small
 differences are hard to interpret. (3) SciFact annotations are incomplete, so some hard
 negatives used in training and some "false" positives at test time may be real
-evidence. (4) English training data only; the French set is small and synthetic.
-(5) Sentences are checked one by one without resolving pronouns, and claims that need
-two documents together are not handled. (6) The contrast set labels come from rules. (7) The error categories were first assigned with AI assistance, and both passes took place on the same day. This limits what their agreement tells us about how consistently someone else could apply the categories.
-(8) Long documents with tables are out of scope. (9) Our dev split is random by claim, not by document, and it is easier than the test set (macro-F1 about 0.83 on dev against 0.68 on test), so the values tuned on dev, the threshold above all, are optimistic.
+evidence. (4) English training data only; the French set is small and synthetic. (5) Sentences are checked one by one without resolving pronouns, and claims that need
+two documents together are not handled. (6) The contrast set labels come from rules. (7) The error categories were first assigned with AI assistance, and both passes took place on the same day. This limits what their agreement tells us about how consistently someone else could apply the categories. (8) Long documents with tables are out of scope. (9) Our dev split is random by claim, not by document, and it is easier than the test set (macro-F1 about 0.83 on dev against 0.68 on test), so the values tuned on dev, the threshold above all, are optimistic.
 
 ## 7. Conclusion and Future Work
 
@@ -539,18 +564,26 @@ We'd start by checking confidence separately for different kinds of claims. An a
 4. Geifman, Y., El-Yaniv, R. (2017). Selective Classification for Deep Neural Networks. NeurIPS.
 5. Guo, C., Pleiss, G., Sun, Y., Weinberger, K. (2017). On Calibration of Modern Neural Networks. ICML.
 6. He, P., Gao, J., Chen, W. (2023). DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing. ICLR.
-7. Karpukhin, V., et al. (2020). Dense Passage Retrieval for Open-Domain Question Answering. EMNLP.
-8. Laban, P., Schnabel, T., Bennett, P., Hearst, M. (2022). SummaC: Re-Visiting NLI-based Models for Inconsistency Detection in Summarization. TACL.
-9. Laurer, M., van Atteveldt, W., Casas, A., Welbers, K. (2024). Less Annotating, More Classifying: Addressing the Data Scarcity Issue of Supervised Machine Learning with Deep Transfer Learning and BERT-NLI. Political Analysis.
-10. Min, S., et al. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation. EMNLP.
-11. Nogueira, R., Cho, K. (2019). Passage Re-ranking with BERT. arXiv:1901.04085.
-12. Robertson, S., Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in Information Retrieval.
-13. Schuster, T., et al. (2019). Towards Debiasing Fact Verification Models. EMNLP.
-14. Tang, L., Laban, P., Durrett, G. (2024). MiniCheck: Efficient Fact-Checking of LLMs on Grounding Documents. EMNLP.
-15. Thorne, J., Vlachos, A., Christodoulopoulos, C., Mittal, A. (2018). FEVER: a Large-scale Dataset for Fact Extraction and VERification. NAACL.
-16. Wadden, D., et al. (2020). Fact or Fiction: Verifying Scientific Claims. EMNLP.
-17. Wadden, D., et al. (2022). MultiVerS: Improving Scientific Claim Verification with Weak Supervision and Full-Document Context. Findings of NAACL.
-18. Xiao, S., Liu, Z., Zhang, P., Muennighoff, N. (2023). C-Pack: Packaged Resources To Advance General Chinese Embedding. arXiv:2309.07597.
+7. Jiang, Y., Bordia, S., Zhong, Z., Dognin, C., Singh, M., Bansal, M. (2020). HoVer: A Dataset for Many-Hop Fact Extraction And Claim Verification. Findings of EMNLP.
+8. Karpukhin, V., et al. (2020). Dense Passage Retrieval for Open-Domain Question Answering. EMNLP.
+9. Laban, P., Schnabel, T., Bennett, P., Hearst, M. (2022). SummaC: Re-Visiting NLI-based Models for Inconsistency Detection in Summarization. TACL.
+10. Laurer, M., van Atteveldt, W., Casas, A., Welbers, K. (2024). Less Annotating, More Classifying: Addressing the Data Scarcity Issue of Supervised Machine Learning with Deep Transfer Learning and BERT-NLI. Political Analysis.
+11. Min, S., et al. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation. EMNLP.
+12. Nguyen, T., Rosenberg, M., Song, X., Gao, J., Tiwary, S., Majumder, R., Deng, L. (2016). MS MARCO: A Human Generated MAchine Reading COmprehension Dataset. arXiv:1611.09268.
+13. Nie, Y., Williams, A., Dinan, E., Bansal, M., Weston, J., Kiela, D. (2020). Adversarial NLI: A New Benchmark for Natural Language Understanding. ACL.
+14. Nogueira, R., Cho, K. (2019). Passage Re-ranking with BERT. arXiv:1901.04085.
+15. Qwen Team (2024). Qwen2.5 Technical Report. arXiv:2412.15115.
+16. Robertson, S., Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in Information Retrieval.
+17. Schuster, T., et al. (2019). Towards Debiasing Fact Verification Models. EMNLP.
+18. Tang, L., Laban, P., Durrett, G. (2024). MiniCheck: Efficient Fact-Checking of LLMs on Grounding Documents. EMNLP.
+19. Thakur, N., Reimers, N., Rücklé, A., Srivastava, A., Gurevych, I. (2021). BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of Information Retrieval Models. NeurIPS Datasets and Benchmarks.
+20. Thorne, J., Vlachos, A., Christodoulopoulos, C., Mittal, A. (2018). FEVER: a Large-scale Dataset for Fact Extraction and VERification. NAACL.
+21. Wadden, D., et al. (2020). Fact or Fiction: Verifying Scientific Claims. EMNLP.
+22. Wadden, D., et al. (2022). MultiVerS: Improving Scientific Claim Verification with Weak Supervision and Full-Document Context. Findings of NAACL.
+23. Williams, A., Nangia, N., Bowman, S. (2018). A Broad-Coverage Challenge Corpus for Sentence Understanding through Inference. NAACL.
+24. Xiao, S., Liu, Z., Zhang, P., Muennighoff, N. (2023). C-Pack: Packaged Resources To Advance General Chinese Embedding. arXiv:2309.07597.
+25. Xiong, W., et al. (2021). Answering Complex Open-Domain Questions with Multi-Hop Dense Retrieval. ICLR.
+26. Yang, Z., Qi, P., Zhang, S., Bengio, Y., Cohen, W., Salakhutdinov, R., Manning, C. (2018). HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering. EMNLP.
 
 <!-- Before submitting: open each reference on Google Scholar and check authors, year and venue. -->
 
@@ -583,6 +616,14 @@ on 209 pairs.
 | INT8 dynamic, all linear layers | 481 MB | 918 ms | 954 ms | 0.407 |
 | INT8 dynamic, feed-forward only | 568 MB | 949 ms | 996 ms | 0.455 |
 
+
+Table A3 – Dev macro-F1 of the verifier (gold evidence), batch size 16, one seed.
+
+| Learning rate | 3 epochs | 5 epochs |
+| --- | --- | --- |
+| 1e-5 | 0.824 | 0.842 |
+| 2e-5 | 0.829 | 0.855 |
+| 5e-5 | **0.858** | 0.855 |
 
 ![Figure A1 – Macro-F1 on test for k = 1, 3, 5, 10 evidence passages, with 95% bootstrap intervals.](../results/figures/ablation_k.png){width=55%}
 

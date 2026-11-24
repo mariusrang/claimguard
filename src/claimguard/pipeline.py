@@ -74,6 +74,7 @@ class ClaimResult:
     timings_ms: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
+        """JSON-ready view of the result (used by the MCP server and the audit log)."""
         return asdict(self)
 
 
@@ -151,6 +152,7 @@ class ClaimGuard:
     def _verify_documents(
         self, claim: str, corpus: dict[str, Document], top: list[tuple[str, float]], timings: dict
     ) -> list[Evidence]:
+        """Select the best sentences of each document, run the verifier, aggregate and decide."""
         selected = []
         with timer(timings, "rerank"):
             for doc_id, score in top:
@@ -275,6 +277,7 @@ def build_retriever(cfg: dict, corpus: dict[str, Document]):
 
 
 def build_reranker(cfg: dict):
+    """Cross-encoder, lexical reranker or none, as asked by the config."""
     kind = cfg.get("kind", "lexical")
     if kind == "none":
         return None
@@ -288,6 +291,7 @@ def build_reranker(cfg: dict):
 
 
 def build_verifier(cfg: dict):
+    """NLI verifier (fine-tuned folder or hub checkpoint), LLM judge or rule-based baseline."""
     kind = cfg.get("kind", "lexical")
     if kind == "lexical":
         from claimguard.verify.lexical import LexicalVerifier

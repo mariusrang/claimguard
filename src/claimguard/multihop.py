@@ -37,6 +37,7 @@ SUPPORTED_IDX = 0  # our label order is SUPPORTED, REFUTED, NEI
 
 @dataclass
 class HoverClaim:
+    """One HoVer claim with its label, number of hops and gold article titles."""
     uid: str
     claim: str
     supported: bool  # True = SUPPORTED, False = NOT_SUPPORTED
@@ -87,6 +88,7 @@ class WikiTexts:
 
     @classmethod
     def from_sqlite(cls, db_path: str | Path, titles: set[str]) -> "WikiTexts":
+        """Read the needed titles from the HoVer authors' SQLite dump (table documents(id, text))."""
         conn = sqlite3.connect(str(db_path))
         texts = {}
         for title in titles:
@@ -114,6 +116,7 @@ class WikiTexts:
         return cls(texts)
 
     def get(self, title: str) -> str:
+        """Text of an article, empty string if it is not loaded."""
         return self.texts.get(norm_title(title), "")
 
     def __contains__(self, title: str) -> bool:
@@ -161,6 +164,7 @@ def verify_joint(verifier, claim: str, docs: list[tuple[str, str]]) -> np.ndarra
 
 
 def is_supported(probs: np.ndarray) -> bool:
+    """Binary decision used on HoVer: SUPPORTED must be the most probable class."""
     return int(np.argmax(probs)) == SUPPORTED_IDX
 
 
@@ -182,6 +186,7 @@ class PoolRetriever:
         self.first_stage = first_stage
 
     def _rerank(self, query: str, titles: list[str]) -> list[tuple[str, float]]:
+        """Cross-encoder scores of the titles for the query, best first."""
         if not titles:
             return []
         scores = self.reranker.score(query, [doc_text(t, self.wiki.get(t)) for t in titles])
@@ -222,6 +227,7 @@ def all_gold_found(retrieved: list[str], gold: list[str]) -> bool:
 
 
 def gold_recall(retrieved: list[str], gold: list[str]) -> float:
+    """Share of the needed articles that were retrieved."""
     found = {norm_title(t) for t in retrieved}
     return sum(norm_title(g) in found for g in gold) / max(1, len(gold))
 
