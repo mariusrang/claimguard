@@ -38,7 +38,9 @@ class TransformerEncoder:
         self.torch = torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name).to(self.device).eval()
+        from claimguard.utils import ensure_float32
+
+        self.model = ensure_float32(AutoModel.from_pretrained(model_name)).to(self.device).eval()
         self.pooling = pooling
         self.max_length = max_length
         self.batch_size = batch_size

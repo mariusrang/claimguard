@@ -108,6 +108,12 @@ def test_dynamic_quantization_keeps_the_interface(tiny_nli_model, tiny_tokenizer
     verifier = NLIVerifier(model=quantized, tokenizer=tiny_tokenizer, device="cpu")
     assert verifier.predict_logits([("smoking causes cancer", "smoking causes lung cancer")]).shape == (1, 3)
     assert count_parameters(tiny_nli_model) > 0
+    # partial recipe: only the feed-forward layers are quantized, attention and classifier stay float32
+    partial = quantize_dynamic_int8(tiny_nli_model, only_feed_forward=True)
+    quantized_names = {n for n, m in partial.named_modules() if isinstance(m, torch.ao.nn.quantized.dynamic.Linear)}
+    assert quantized_names == {"bert.encoder.layer.0.intermediate.dense", "bert.encoder.layer.0.output.dense"}
+    assert model_size_mb(quantized) < model_size_mb(partial) < size_fp32
+    assert isinstance(tiny_nli_model.classifier, torch.nn.Linear)  # the original model was not modified
     stats = benchmark(lambda: None, n_warmup=1, n_runs=5)
     assert stats["n_runs"] == 5 and stats["p95_ms"] >= stats["p50_ms"] >= 0
 
@@ -137,3 +143,35 @@ def test_llm_judge_reads_the_letter_logits(tiny_tokenizer):
     assert logits.shape == (2, 3) and np.isfinite(logits).all()
     assert np.allclose(logits[0], logits[1])  # same input -> same scores
     assert judge.predict_logits([]).shape == (0, 3)
+
+
+def test_half_precision_checkpoint_is_converted_to_float32(tiny_nli_model, tiny_tokenizer):
+    # this is the Kaggle bug: a checkpoint stored in float16 gave loss=nan in training
+    from claimguard.efficiency import quantize_dynamic_int8
+    from claimguard.verify.nli import NLIVerifier
+
+    verifier = NLIVerifier(model=tiny_nli_model.half(), tokenizer=tiny_tokenizer, device="cpu")
+    assert next(verifier.model.parameters()).dtype == torch.float32
+    assert np.isfinite(verifier.predict_logits([("smoking causes cancer", "smoking causes lung cancer")])).all()
+    quantize_dynamic_int8(verifier.model)  # failed with "expected Float but found Half" before the fix
+
+
+def test_training_from_a_half_model_gives_finite_loss(tiny_nli_model, tiny_tokenizer, tmp_path):
+    from claimguard.verify.train import train_verifier
+
+    pairs = [("smoking causes cancer", "smoking causes lung cancer", 0), ("caffeine increases sleep", "statins lower cholesterol", 2)] * 6
+    summary = train_verifier(pairs, pairs, tmp_path / "ckpt", epochs=1, batch_size=4, lr=1e-3, max_length=32,
+                             device="cpu", model=tiny_nli_model.half(), tokenizer=tiny_tokenizer)
+    assert np.isfinite(summary["history"][0]["train_loss"])
+
+
+def test_training_stops_on_nan_loss(tiny_nli_model, tiny_tokenizer, tmp_path):
+    from claimguard.verify.train import train_verifier
+
+    with torch.no_grad():
+        for p in tiny_nli_model.classifier.parameters():
+            p.fill_(float("nan"))  # broken weights -> NaN logits -> NaN loss
+    pairs = [("smoking causes cancer", "smoking causes lung cancer", 0)] * 4
+    with pytest.raises(RuntimeError, match="loss is nan"):
+        train_verifier(pairs, pairs, tmp_path / "ckpt", epochs=1, batch_size=2, lr=1e-3, max_length=32,
+                       device="cpu", model=tiny_nli_model, tokenizer=tiny_tokenizer)

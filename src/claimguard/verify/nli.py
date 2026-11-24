@@ -57,8 +57,11 @@ class NLIVerifier:
             # normal case: load from the hub or from a local folder
             tokenizer = AutoTokenizer.from_pretrained(model_name)
             model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        from claimguard.utils import ensure_float32
+
         self.tokenizer = tokenizer
-        self.model = model.to(self.device).eval()
+        # float32 always: some hub checkpoints are stored in float16 (see utils.ensure_float32)
+        self.model = ensure_float32(model).to(self.device).eval()
         self.index_map = map_model_labels(self.model.config.id2label)
         self.max_length = max_length
         self.batch_size = batch_size

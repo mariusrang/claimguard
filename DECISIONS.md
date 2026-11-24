@@ -165,3 +165,29 @@ to be able to explain without notes.
 5. What is the difference between ECE and AURC?
 6. Why is a perfect flip rate on the contrast set not enough?
 7. What exactly does "SUPPORTED" guarantee, and what does it not?
+
+## Incidents
+
+- **23 Nov, first Kaggle run: every training run had `loss=nan`.** Recent versions of
+  `transformers` load a checkpoint in the dtype it was saved in, and the NLI checkpoint
+  is stored in float16. Training in float16 with AdamW (no loss scaling) gave NaN from
+  the first epoch; the "fine-tuned" model then predicted one class only (macro-F1 0.195).
+  The same cause broke the INT8 benchmark ("expected Float but found Half") and made CPU
+  inference very slow. Fix: every model is converted to float32 when loaded
+  (`utils.ensure_float32`), training stops at the first non-finite loss, and the Kaggle
+  notebook checks that the first seed reaches dev macro-F1 > 0.3 before going on.
+  Three regression tests cover it. Lesson: a run that "succeeds" can still be wrong;
+  `run_status.json` said OK because no exception was raised.
+- **24 Nov, second Kaggle run (after the float32 fix).** Training works (dev macro-F1 on
+  evidence pairs 0.844-0.855 over 3 seeds). Two things to report honestly:
+  - the sweep ran out of GPU memory at batch size 32 (float32 on a 15 GB T4). The 6
+    batch-16 runs finished; the best (lr 5e-5, 3 epochs, 0.858) is 0.003 above the
+    default (lr 2e-5, 5 epochs, 0.855), well inside the noise between seeds (0.844-0.855).
+    The crash happened before the config was updated, so the 3 seeds used the default.
+    I keep it that way and say it: re-training for a 0.003 gain is not worth GPU time.
+  - dynamic INT8 on every Linear layer broke the verifier (accuracy with gold evidence
+    0.856 -> 0.407) for a small speed gain (1.02 s -> 0.88 s per claim on CPU). DeBERTa's
+    attention projections are too sensitive. Session 3 tests quantizing only the
+    feed-forward layers. A negative result that is measured is still a result.
+- **Results of the two runs are merged** in `results/` (see `results/PROVENANCE.md`): run 1
+  for everything that does not use the fine-tuned model, run 2 for the rest.

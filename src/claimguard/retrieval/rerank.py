@@ -44,7 +44,9 @@ class CrossEncoderReranker:
         self.torch = torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        from claimguard.utils import ensure_float32
+
+        self.model = ensure_float32(AutoModelForSequenceClassification.from_pretrained(model_name))
         self.model.to(self.device).eval()
         self.max_length = max_length
         self.batch_size = batch_size

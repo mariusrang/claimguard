@@ -114,10 +114,13 @@ def main() -> None:
 
     if (res / "efficiency.json").exists():
         e = load_json(res / "efficiency.json")
+        names = [n for n in ("fp32_cpu", "int8_cpu", "int8_ffn_cpu") if n in e]
         rows = [[n, f"{e[n]['size_mb']:.0f}", f"{e[n]['latency_5_pairs']['p50_ms']:.0f}", f"{e[n]['latency_5_pairs']['p95_ms']:.0f}",
-                 f"{e[n]['seconds_per_1000_claims']:.0f}", f"{e[n]['macro_f1_gold_evidence']:.3f}"] for n in ("fp32_cpu", "int8_cpu")]
+                 f"{e[n]['seconds_per_1000_claims']:.0f}", f"{e[n]['accuracy_gold_evidence']:.3f}",
+                 f"{e[n].get('macro_f1_sr_gold_evidence', float('nan')):.3f}"] for n in names]
         parts += [f"## Efficiency ({e['n_parameters'] / 1e6:.0f}M parameters, CPU)",
-                  table(["Model", "Size (MB)", "p50 ms / claim", "p95 ms / claim", "Seconds / 1,000 claims", "Macro-F1 (gold evidence)"], rows)]
+                  table(["Model", "Size (MB)", "p50 ms / claim", "p95 ms / claim", "Seconds / 1,000 claims",
+                         "Accuracy (gold evidence)", "Macro-F1 S/R (gold evidence)"], rows)]
 
     if (res / "sweep.json").exists():
         sweep = load_json(res / "sweep.json")

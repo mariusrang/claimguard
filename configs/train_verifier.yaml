@@ -17,11 +17,12 @@ train:
   seeds: [13, 42, 2026]   # 3 runs to report mean +- std
 
 # hyperparameter search (scripts/train_verifier.py --sweep), 1 seed per combination.
-# SciFact gives only ~1,570 training pairs of ~85 words, so one run takes about 3 min
-# on the free Colab T4: the full 12-run grid fits in one session.
+# SciFact gives only ~1,570 training pairs of ~85 words, so one run takes about 4 min on a T4.
+# Batch size 32 does not fit in the 15 GB of a T4 in float32 (out of memory on Kaggle, 24 Nov),
+# so the grid is learning rate x epochs at batch size 16 (6 runs).
 sweep:
   lr: [1.0e-5, 2.0e-5, 5.0e-5]
-  batch_size: [16, 32]
+  batch_size: [16]
   epochs: [3, 5]
 
 # ablation A5: where does the performance come from?

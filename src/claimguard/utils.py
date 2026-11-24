@@ -102,6 +102,22 @@ def timer(store: dict, key: str) -> Iterator[None]:
         store[key] = store.get(key, 0.0) + (time.perf_counter() - start) * 1000.0
 
 
+def ensure_float32(model):
+    """Make sure a torch model is in float32.
+
+    Recent versions of transformers load a checkpoint in the dtype it was SAVED in.
+    Some hub checkpoints are saved in float16, and training a float16 model with
+    AdamW gives NaN losses from the first step (this happened on Kaggle: 12 sweep
+    runs + 3 seeds with loss=nan). Float16 on CPU is also very slow and breaks the
+    INT8 quantization. So every model we train or run on CPU goes through this.
+    """
+    import torch
+
+    if any(p.dtype in (torch.float16, torch.bfloat16) for p in model.parameters()):
+        model = model.float()
+    return model
+
+
 def softmax(logits: np.ndarray, axis: int = -1) -> np.ndarray:
     """Numerically stable softmax in numpy."""
     z = logits - logits.max(axis=axis, keepdims=True)

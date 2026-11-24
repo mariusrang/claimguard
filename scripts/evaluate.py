@@ -430,6 +430,23 @@ def cmd_given(args: argparse.Namespace) -> None:
     pred = np.array([LABEL_TO_IDX[r.label] for r in results])
     gold = np.array([LABEL_TO_IDX[ex.label] for ex in examples])
     conf = np.array([r.confidence for r in results])
+    # one line per example, so errors can be analysed later without running the model again
+    tag = f"_{args.tag}" if args.tag else ""
+    write_jsonl(
+        Path(args.out) / f"predictions_given_{args.dataset}{tag}.jsonl",
+        [
+            {
+                "claim_id": ex.claim_id,
+                "claim": ex.text,
+                "gold": ex.label,
+                "pred": r.label,
+                "confidence": round(r.confidence, 4),
+                "top_evidence": max(r.evidence, key=lambda e: max(e.probs[:2])).text if r.evidence else "",
+                **{k: v for k, v in ex.meta.items() if isinstance(v, (str, int, float))},
+            }
+            for ex, r in zip(examples, results)
+        ],
+    )
     out = {
         "dataset": args.dataset,
         "verifier": getattr(pipeline.verifier, "name", "?"),
@@ -528,12 +545,19 @@ def cmd_efficiency(args: argparse.Namespace) -> None:
     out = {}
     fp32 = NLIVerifier(model=verifier.model, tokenizer=verifier.tokenizer, device="cpu")
     int8 = NLIVerifier(model=quantize_dynamic_int8(verifier.model), tokenizer=verifier.tokenizer, device="cpu")
-    for name, v in (("fp32_cpu", fp32), ("int8_cpu", int8)):
+    int8_ffn = NLIVerifier(
+        model=quantize_dynamic_int8(verifier.model, only_feed_forward=True), tokenizer=verifier.tokenizer, device="cpu"
+    )
+    variants = (("fp32_cpu", fp32), ("int8_cpu", int8), ("int8_ffn_cpu", int8_ffn))
+    for name, v in variants:
         pred = v.predict_logits(pairs).argmax(axis=1)
+        per_class = per_class_prf(gold, pred)
         out[name] = {
             "size_mb": model_size_mb(v.model),
             "accuracy_gold_evidence": accuracy(gold, pred),
-            "macro_f1_gold_evidence": macro_f1(gold, pred),
+            # gold-evidence pairs are only SUPPORTED or REFUTED (NEI claims have no gold evidence),
+            # so a 3-class macro-F1 would count an empty class: average S and R only
+            "macro_f1_sr_gold_evidence": float(np.mean([per_class[0]["f1"], per_class[1]["f1"]])),
             "latency_5_pairs": benchmark(lambda v=v: v.predict_logits(batch), n_runs=args.runs),
         }
         print(name, {k: (round(x, 3) if isinstance(x, float) else x) for k, x in out[name].items() if k != "latency_5_pairs"},
@@ -541,7 +565,7 @@ def cmd_efficiency(args: argparse.Namespace) -> None:
     out["n_parameters"] = count_parameters(fp32.model)
     out["n_pairs"] = len(pairs)
     # seconds to verify 1,000 claims (5 passages each) -> multiply by the price per second of a machine
-    for name in ("fp32_cpu", "int8_cpu"):
+    for name, _ in variants:
         out[name]["seconds_per_1000_claims"] = out[name]["latency_5_pairs"]["mean_ms"]
     save_json(out_path(args, "efficiency"), out)
 

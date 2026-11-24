@@ -1,0 +1,30 @@
+{
+  "fp32_cpu": {
+    "size_mb": 737.779371,
+    "accuracy_gold_evidence": 0.8564593301435407,
+    "macro_f1_gold_evidence": 0.5870646766169154,
+    "latency_5_pairs": {
+      "p50_ms": 1018.5044564996133,
+      "p95_ms": 1061.8346835501143,
+      "mean_ms": 1017.0998665666351,
+      "calls_per_second": 0.9831876228394778,
+      "n_runs": 30
+    },
+    "seconds_per_1000_claims": 1017.0998665666351
+  },
+  "int8_cpu": {
+    "size_mb": 481.258179,
+    "accuracy_gold_evidence": 0.40669856459330145,
+    "macro_f1_gold_evidence": 0.20757020757020758,
+    "latency_5_pairs": {
+      "p50_ms": 882.3237570004494,
+      "p95_ms": 921.6936376501053,
+      "mean_ms": 887.8561623666732,
+      "calls_per_second": 1.126308564817972,
+      "n_runs": 30
+    },
+    "seconds_per_1000_claims": 887.8561623666732
+  },
+  "n_parameters": 184424451,
+  "n_pairs": 209
+}

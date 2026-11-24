@@ -17,7 +17,7 @@ from claimguard import LABELS, NEI
 from claimguard.data import Claim, Document
 from claimguard.metrics import accuracy, macro_f1
 from claimguard.retrieval.rerank import LexicalReranker, rerank
-from claimguard.utils import save_json, set_seed
+from claimguard.utils import ensure_float32, save_json, set_seed
 from claimguard.verify.nli import NLIVerifier, map_model_labels
 
 Pair = tuple[str, str, int]  # (claim, evidence text, label index in our order)
@@ -100,7 +100,7 @@ def load_model_for_training(base_model: str):
             label2id={v: k for k, v in id2label.items()},
             ignore_mismatched_sizes=True,
         )
-    return tokenizer, model
+    return tokenizer, ensure_float32(model)
 
 
 def evaluate_pairs(verifier, pairs: list[Pair]) -> dict:
@@ -135,7 +135,7 @@ def train_verifier(
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     if model is None:
         tokenizer, model = load_model_for_training(base_model)
-    model.to(device)
+    model = ensure_float32(model).to(device)  # never train in float16 (NaN losses)
     index_map = map_model_labels(model.config.id2label)  # our label idx -> model idx
 
     # no weight decay on biases and LayerNorm weights (usual trick for transformers)
@@ -195,6 +195,12 @@ def train_verifier(
             scaler.step(optimizer)
             scaler.update()
             scheduler.step()
+            if not torch.isfinite(loss):
+                # stop at once instead of wasting GPU time on a broken run
+                raise RuntimeError(
+                    f"loss is {loss.item()} at epoch {epoch}, batch {start // batch_size}: "
+                    f"model dtype is {next(model.parameters()).dtype}, lr={lr}. Training stopped."
+                )
             running_loss += loss.item() * len(batch)
 
         # end of epoch: check how we do on dev

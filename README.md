@@ -132,8 +132,10 @@ python scripts/train_verifier.py --config configs/train_verifier.yaml --sweep   
 
 The training loop is in `src/claimguard/verify/train.py` (AdamW, linear warmup and
 decay, gradient clipping, best epoch kept on dev macro-F1). The checkpoint goes to
-`models/verifier/` with a `train_log.json`. `notebooks/01_colab_run_all.ipynb` runs
-the whole project on a Colab GPU.
+`models/verifier/` with a `train_log.json`. `notebooks/03_kaggle_run_all.ipynb` runs
+every GPU experiment in one unattended Kaggle run (about 3 h on a T4; a failed step is
+logged in `results/run_status.json` and the run goes on). `notebooks/01_colab_run_all.ipynb`
+does the same on Colab in 3 interactive sessions.
 
 ## Evaluation
 
@@ -236,7 +238,7 @@ claimguard/
 │   ├── pipeline.py  decompose.py  contrast.py  audit.py  efficiency.py  aggrefact.py
 │   ├── mcp_server.py  data.py  text.py  utils.py
 ├── scripts/                 # train_verifier.py, evaluate.py, make_tables.py, make_figures.py
-├── notebooks/               # 01_colab_run_all.ipynb, 02_error_analysis.ipynb
+├── notebooks/               # 03_kaggle_run_all.ipynb, 01_colab_run_all.ipynb, 02_error_analysis.ipynb
 ├── configs/                 # default.yaml, offline.yaml, train_verifier.yaml
 ├── tests/                   # 63 tests: preprocessing, retrieval, metrics, model, pipeline
 ├── app.py                   # Gradio demo

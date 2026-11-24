@@ -1,0 +1,106 @@
+{
+  "dataset": "french",
+  "verifier": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
+  "n": 60,
+  "accuracy": {
+    "value": 0.9333333333333333,
+    "low": 0.8666666666666667,
+    "high": 0.9833333333333333
+  },
+  "macro_f1": {
+    "value": 0.934122934122934,
+    "low": 0.8656257162641112,
+    "high": 0.9849173772703185
+  },
+  "ece": 0.06451090330741026,
+  "per_class": {
+    "SUPPORTED": {
+      "precision": 1.0,
+      "recall": 0.95,
+      "f1": 0.9743589743589743,
+      "support": 20
+    },
+    "REFUTED": {
+      "precision": 0.8333333333333334,
+      "recall": 1.0,
+      "f1": 0.9090909090909091,
+      "support": 20
+    },
+    "NEI": {
+      "precision": 1.0,
+      "recall": 0.85,
+      "f1": 0.9189189189189189,
+      "support": 20
+    }
+  },
+  "confusion_matrix": [
+    [
+      19,
+      1,
+      0
+    ],
+    [
+      0,
+      20,
+      0
+    ],
+    [
+      0,
+      3,
+      17
+    ]
+  ],
+  "alerts": {
+    "threshold": 0.0,
+    "n_alerts": 41,
+    "alert_precision": 0.975609756097561,
+    "alert_recall": 1.0
+  },
+  "by_category": {
+    "amount": {
+      "n": 6,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "date": {
+      "n": 1,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "direction": {
+      "n": 1,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "duration": {
+      "n": 5,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "missing_info": {
+      "n": 20,
+      "accuracy": 0.85,
+      "not_supported_rate": 1.0
+    },
+    "negation": {
+      "n": 3,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "paraphrase": {
+      "n": 20,
+      "accuracy": 0.95,
+      "not_supported_rate": 0.05
+    },
+    "rate": {
+      "n": 1,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    },
+    "threshold": {
+      "n": 3,
+      "accuracy": 1.0,
+      "not_supported_rate": 1.0
+    }
+  }
+}

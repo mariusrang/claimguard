@@ -1,0 +1,143 @@
+[
+  {
+    "seed": 13,
+    "dir": "models/verifier",
+    "base_model": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+    "lr": 2e-05,
+    "epochs": 5,
+    "batch_size": 16,
+    "n_train_pairs": 1567,
+    "best_dev_macro_f1": 0.8547277898249668,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 0.6102739910582637,
+        "accuracy": 0.8402777777777778,
+        "macro_f1": 0.8233218933781773,
+        "n": 288
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.2337853180240999,
+        "accuracy": 0.8194444444444444,
+        "macro_f1": 0.7976982151319699,
+        "n": 288
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.10796036488770602,
+        "accuracy": 0.8680555555555556,
+        "macro_f1": 0.8488550054107784,
+        "n": 288
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.03558380304031602,
+        "accuracy": 0.8645833333333334,
+        "macro_f1": 0.849337984167888,
+        "n": 288
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.01566624615416311,
+        "accuracy": 0.8715277777777778,
+        "macro_f1": 0.8547277898249668,
+        "n": 288
+      }
+    ]
+  },
+  {
+    "seed": 42,
+    "dir": "models/verifier-seed42",
+    "base_model": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+    "lr": 2e-05,
+    "epochs": 5,
+    "batch_size": 16,
+    "n_train_pairs": 1567,
+    "best_dev_macro_f1": 0.8438588898886273,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 0.5882211372436956,
+        "accuracy": 0.8472222222222222,
+        "macro_f1": 0.826843337792243,
+        "n": 288
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.23708115472210464,
+        "accuracy": 0.8611111111111112,
+        "macro_f1": 0.8438588898886273,
+        "n": 288
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0868125699541336,
+        "accuracy": 0.84375,
+        "macro_f1": 0.8287675156147104,
+        "n": 288
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.04028534691315144,
+        "accuracy": 0.8576388888888888,
+        "macro_f1": 0.8428062241146353,
+        "n": 288
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.015072500069676788,
+        "accuracy": 0.8611111111111112,
+        "macro_f1": 0.8438337437873745,
+        "n": 288
+      }
+    ]
+  },
+  {
+    "seed": 2026,
+    "dir": "models/verifier-seed2026",
+    "base_model": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+    "lr": 2e-05,
+    "epochs": 5,
+    "batch_size": 16,
+    "n_train_pairs": 1567,
+    "best_dev_macro_f1": 0.8522986294332123,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 0.6039516358578669,
+        "accuracy": 0.8472222222222222,
+        "macro_f1": 0.8287305951186973,
+        "n": 288
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.20086455470201842,
+        "accuracy": 0.8611111111111112,
+        "macro_f1": 0.835605109893821,
+        "n": 288
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.09873011034640561,
+        "accuracy": 0.8611111111111112,
+        "macro_f1": 0.8397324761010377,
+        "n": 288
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.03353640066647585,
+        "accuracy": 0.875,
+        "macro_f1": 0.8522986294332123,
+        "n": 288
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.018629518282534667,
+        "accuracy": 0.8715277777777778,
+        "macro_f1": 0.849749792080743,
+        "n": 288
+      }
+    ]
+  }
+]

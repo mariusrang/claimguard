@@ -1,0 +1,56 @@
+{
+  "verifier": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
+  "n": 1100,
+  "by_dataset": {
+    "AggreFact-CNN": {
+      "n": 100,
+      "balanced_accuracy": 0.7388888888888889
+    },
+    "AggreFact-XSum": {
+      "n": 100,
+      "balanced_accuracy": 0.6660664265706283
+    },
+    "ClaimVerify": {
+      "n": 100,
+      "balanced_accuracy": 0.695418419822347
+    },
+    "ExpertQA": {
+      "n": 100,
+      "balanced_accuracy": 0.538878842676311
+    },
+    "FactCheck-GPT": {
+      "n": 100,
+      "balanced_accuracy": 0.7395979429640018
+    },
+    "Lfqa": {
+      "n": 100,
+      "balanced_accuracy": 0.7998712998712998
+    },
+    "RAGTruth": {
+      "n": 100,
+      "balanced_accuracy": 0.7481060606060606
+    },
+    "Reveal": {
+      "n": 100,
+      "balanced_accuracy": 0.8119047619047619
+    },
+    "TofuEval-MediaS": {
+      "n": 100,
+      "balanced_accuracy": 0.6857142857142857
+    },
+    "TofuEval-MeetB": {
+      "n": 100,
+      "balanced_accuracy": 0.7949561403508771
+    },
+    "Wice": {
+      "n": 100,
+      "balanced_accuracy": 0.7123015873015872
+    }
+  },
+  "mean_balanced_accuracy": 0.7210640596973682,
+  "pooled_balanced_accuracy": 0.7243267413900498,
+  "latency_ms_per_claim": {
+    "p50": 59.135,
+    "p95": 120.97549999999998
+  }
+}

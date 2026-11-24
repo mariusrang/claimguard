@@ -1,0 +1,700 @@
+{
+  "verifier": "models/verifier",
+  "temperature": 1.0,
+  "chosen_on_dev": {
+    "top_k": 3,
+    "aggregation": "noisy_or",
+    "temperature": 1.0,
+    "dev_macro_f1": 0.8326661657777942,
+    "grid": [
+      {
+        "k": 1,
+        "aggregation": "majority",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.7950011113643334
+      },
+      {
+        "k": 1,
+        "aggregation": "max_conf",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.7950011113643334
+      },
+      {
+        "k": 1,
+        "aggregation": "noisy_or",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.7950011113643334
+      },
+      {
+        "k": 3,
+        "aggregation": "majority",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.45491917196986326
+      },
+      {
+        "k": 3,
+        "aggregation": "max_conf",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.8222666628022685
+      },
+      {
+        "k": 3,
+        "aggregation": "noisy_or",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.8326661657777942
+      },
+      {
+        "k": 5,
+        "aggregation": "majority",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.4114739115985377
+      },
+      {
+        "k": 5,
+        "aggregation": "max_conf",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.8220534003085843
+      },
+      {
+        "k": 5,
+        "aggregation": "noisy_or",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.8323456790123457
+      },
+      {
+        "k": 10,
+        "aggregation": "majority",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.2465495289024701
+      },
+      {
+        "k": 10,
+        "aggregation": "max_conf",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.7961276046468745
+      },
+      {
+        "k": 10,
+        "aggregation": "noisy_or",
+        "temperature": 1.0,
+        "dev_macro_f1": 0.8062695432104786
+      }
+    ],
+    "source": "tuned in this run"
+  },
+  "main": {
+    "k": 3,
+    "aggregation": "noisy_or",
+    "n": 300,
+    "accuracy": {
+      "value": 0.69,
+      "low": 0.64,
+      "high": 0.74
+    },
+    "macro_f1": {
+      "value": 0.6854624787395664,
+      "low": 0.6280281773755897,
+      "high": 0.7359606801795718
+    },
+    "fever_score": 0.67,
+    "evidence_sentences": {
+      "precision": 0.22303921568627452,
+      "recall": 0.4972677595628415,
+      "f1": 0.3079526226734349
+    },
+    "per_class": {
+      "SUPPORTED": {
+        "precision": 0.708029197080292,
+        "recall": 0.782258064516129,
+        "f1": 0.7432950191570882,
+        "support": 124
+      },
+      "REFUTED": {
+        "precision": 0.6875,
+        "recall": 0.6875,
+        "f1": 0.6875,
+        "support": 64
+      },
+      "NEI": {
+        "precision": 0.6666666666666666,
+        "recall": 0.5892857142857143,
+        "f1": 0.6255924170616114,
+        "support": 112
+      }
+    },
+    "confusion_matrix": [
+      [
+        97,
+        7,
+        20
+      ],
+      [
+        7,
+        44,
+        13
+      ],
+      [
+        33,
+        13,
+        66
+      ]
+    ]
+  },
+  "A2_no_reranker": {
+    "k": 3,
+    "aggregation": "noisy_or",
+    "n": 300,
+    "accuracy": {
+      "value": 0.6833333333333333,
+      "low": 0.63325,
+      "high": 0.7333333333333333
+    },
+    "macro_f1": {
+      "value": 0.6742548151734153,
+      "low": 0.6198809320525915,
+      "high": 0.7248774687853258
+    },
+    "fever_score": 0.66,
+    "evidence_sentences": {
+      "precision": 0.2197962154294032,
+      "recall": 0.412568306010929,
+      "f1": 0.28679962013295346
+    },
+    "per_class": {
+      "SUPPORTED": {
+        "precision": 0.7478260869565218,
+        "recall": 0.6935483870967742,
+        "f1": 0.7196652719665273,
+        "support": 124
+      },
+      "REFUTED": {
+        "precision": 0.6666666666666666,
+        "recall": 0.59375,
+        "f1": 0.628099173553719,
+        "support": 64
+      },
+      "NEI": {
+        "precision": 0.6328125,
+        "recall": 0.7232142857142857,
+        "f1": 0.675,
+        "support": 112
+      }
+    },
+    "confusion_matrix": [
+      [
+        86,
+        8,
+        30
+      ],
+      [
+        9,
+        38,
+        17
+      ],
+      [
+        20,
+        11,
+        81
+      ]
+    ]
+  },
+  "A3_number_of_evidence": [
+    {
+      "k": 1,
+      "aggregation": "noisy_or",
+      "n": 300,
+      "accuracy": {
+        "value": 0.6833333333333333,
+        "low": 0.6333333333333333,
+        "high": 0.7300833333333332
+      },
+      "macro_f1": {
+        "value": 0.6776353276353276,
+        "low": 0.6207388856392603,
+        "high": 0.727805542340275
+      },
+      "fever_score": 0.6466666666666666,
+      "evidence_sentences": {
+        "precision": 0.3096646942800789,
+        "recall": 0.42896174863387976,
+        "f1": 0.3596792668957618
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.7413793103448276,
+          "recall": 0.6935483870967742,
+          "f1": 0.7166666666666668,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.7169811320754716,
+          "recall": 0.59375,
+          "f1": 0.6495726495726496,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.6183206106870229,
+          "recall": 0.7232142857142857,
+          "f1": 0.6666666666666667,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          86,
+          7,
+          31
+        ],
+        [
+          7,
+          38,
+          19
+        ],
+        [
+          23,
+          8,
+          81
+        ]
+      ]
+    },
+    {
+      "k": 3,
+      "aggregation": "noisy_or",
+      "n": 300,
+      "accuracy": {
+        "value": 0.69,
+        "low": 0.64,
+        "high": 0.74
+      },
+      "macro_f1": {
+        "value": 0.6854624787395664,
+        "low": 0.6280281773755897,
+        "high": 0.7359606801795718
+      },
+      "fever_score": 0.67,
+      "evidence_sentences": {
+        "precision": 0.22303921568627452,
+        "recall": 0.4972677595628415,
+        "f1": 0.3079526226734349
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.708029197080292,
+          "recall": 0.782258064516129,
+          "f1": 0.7432950191570882,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.6875,
+          "recall": 0.6875,
+          "f1": 0.6875,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.6666666666666666,
+          "recall": 0.5892857142857143,
+          "f1": 0.6255924170616114,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          97,
+          7,
+          20
+        ],
+        [
+          7,
+          44,
+          13
+        ],
+        [
+          33,
+          13,
+          66
+        ]
+      ]
+    },
+    {
+      "k": 5,
+      "aggregation": "noisy_or",
+      "n": 300,
+      "accuracy": {
+        "value": 0.6866666666666666,
+        "low": 0.6366666666666667,
+        "high": 0.74
+      },
+      "macro_f1": {
+        "value": 0.6806298276886512,
+        "low": 0.6272422342298484,
+        "high": 0.732041638405641
+      },
+      "fever_score": 0.67,
+      "evidence_sentences": {
+        "precision": 0.19393939393939394,
+        "recall": 0.5245901639344263,
+        "f1": 0.2831858407079646
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.7,
+          "recall": 0.7903225806451613,
+          "f1": 0.7424242424242423,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.6617647058823529,
+          "recall": 0.703125,
+          "f1": 0.6818181818181819,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.6847826086956522,
+          "recall": 0.5625,
+          "f1": 0.6176470588235294,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          98,
+          7,
+          19
+        ],
+        [
+          9,
+          45,
+          10
+        ],
+        [
+          33,
+          16,
+          63
+        ]
+      ]
+    },
+    {
+      "k": 10,
+      "aggregation": "noisy_or",
+      "n": 300,
+      "accuracy": {
+        "value": 0.6766666666666666,
+        "low": 0.6265833333333334,
+        "high": 0.73
+      },
+      "macro_f1": {
+        "value": 0.6683760683760683,
+        "low": 0.6126211970111527,
+        "high": 0.7207037316271107
+      },
+      "fever_score": 0.6633333333333333,
+      "evidence_sentences": {
+        "precision": 0.14708056171470807,
+        "recall": 0.5437158469945356,
+        "f1": 0.2315299592786504
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.678082191780822,
+          "recall": 0.7983870967741935,
+          "f1": 0.7333333333333334,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.6338028169014085,
+          "recall": 0.703125,
+          "f1": 0.6666666666666667,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.7108433734939759,
+          "recall": 0.5267857142857143,
+          "f1": 0.6051282051282051,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          99,
+          9,
+          16
+        ],
+        [
+          11,
+          45,
+          8
+        ],
+        [
+          36,
+          17,
+          59
+        ]
+      ]
+    }
+  ],
+  "A4_aggregation": [
+    {
+      "k": 3,
+      "aggregation": "majority",
+      "n": 300,
+      "accuracy": {
+        "value": 0.45,
+        "low": 0.39666666666666667,
+        "high": 0.5066666666666667
+      },
+      "macro_f1": {
+        "value": 0.365047387208052,
+        "low": 0.3076017079532008,
+        "high": 0.42484171318633396
+      },
+      "fever_score": 0.43666666666666665,
+      "evidence_sentences": {
+        "precision": 0.11206896551724138,
+        "recall": 0.10655737704918032,
+        "f1": 0.10924369747899158
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.7105263157894737,
+          "recall": 0.21774193548387097,
+          "f1": 0.3333333333333333,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.6153846153846154,
+          "recall": 0.125,
+          "f1": 0.2077922077922078,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.40160642570281124,
+          "recall": 0.8928571428571429,
+          "f1": 0.554016620498615,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          27,
+          1,
+          96
+        ],
+        [
+          3,
+          8,
+          53
+        ],
+        [
+          8,
+          4,
+          100
+        ]
+      ]
+    },
+    {
+      "k": 3,
+      "aggregation": "max_conf",
+      "n": 300,
+      "accuracy": {
+        "value": 0.6933333333333334,
+        "low": 0.6433333333333333,
+        "high": 0.74
+      },
+      "macro_f1": {
+        "value": 0.6894279588939911,
+        "low": 0.6321529916690803,
+        "high": 0.7380887620273706
+      },
+      "fever_score": 0.6733333333333333,
+      "evidence_sentences": {
+        "precision": 0.22303921568627452,
+        "recall": 0.4972677595628415,
+        "f1": 0.3079526226734349
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.708029197080292,
+          "recall": 0.782258064516129,
+          "f1": 0.7432950191570882,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.6984126984126984,
+          "recall": 0.6875,
+          "f1": 0.6929133858267716,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.67,
+          "recall": 0.5982142857142857,
+          "f1": 0.6320754716981132,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          97,
+          7,
+          20
+        ],
+        [
+          7,
+          44,
+          13
+        ],
+        [
+          33,
+          12,
+          67
+        ]
+      ]
+    },
+    {
+      "k": 3,
+      "aggregation": "noisy_or",
+      "n": 300,
+      "accuracy": {
+        "value": 0.69,
+        "low": 0.64,
+        "high": 0.74
+      },
+      "macro_f1": {
+        "value": 0.6854624787395664,
+        "low": 0.6280281773755897,
+        "high": 0.7359606801795718
+      },
+      "fever_score": 0.67,
+      "evidence_sentences": {
+        "precision": 0.22303921568627452,
+        "recall": 0.4972677595628415,
+        "f1": 0.3079526226734349
+      },
+      "per_class": {
+        "SUPPORTED": {
+          "precision": 0.708029197080292,
+          "recall": 0.782258064516129,
+          "f1": 0.7432950191570882,
+          "support": 124
+        },
+        "REFUTED": {
+          "precision": 0.6875,
+          "recall": 0.6875,
+          "f1": 0.6875,
+          "support": 64
+        },
+        "NEI": {
+          "precision": 0.6666666666666666,
+          "recall": 0.5892857142857143,
+          "f1": 0.6255924170616114,
+          "support": 112
+        }
+      },
+      "confusion_matrix": [
+        [
+          97,
+          7,
+          20
+        ],
+        [
+          7,
+          44,
+          13
+        ],
+        [
+          33,
+          13,
+          66
+        ]
+      ]
+    }
+  ],
+  "A6_oracle_evidence": {
+    "k": 3,
+    "aggregation": "noisy_or",
+    "n": 300,
+    "accuracy": {
+      "value": 0.7533333333333333,
+      "low": 0.7066666666666667,
+      "high": 0.8
+    },
+    "macro_f1": {
+      "value": 0.7496930538597205,
+      "low": 0.6981580950262161,
+      "high": 0.7967754124878865
+    },
+    "fever_score": 0.7533333333333333,
+    "evidence_sentences": {
+      "precision": 0.6337209302325582,
+      "recall": 0.8934426229508197,
+      "f1": 0.7414965986394557
+    },
+    "per_class": {
+      "SUPPORTED": {
+        "precision": 0.7248322147651006,
+        "recall": 0.8709677419354839,
+        "f1": 0.7912087912087912,
+        "support": 124
+      },
+      "REFUTED": {
+        "precision": 0.7323943661971831,
+        "recall": 0.8125,
+        "f1": 0.7703703703703704,
+        "support": 64
+      },
+      "NEI": {
+        "precision": 0.825,
+        "recall": 0.5892857142857143,
+        "f1": 0.6875000000000001,
+        "support": 112
+      }
+    },
+    "confusion_matrix": [
+      [
+        108,
+        6,
+        10
+      ],
+      [
+        8,
+        52,
+        4
+      ],
+      [
+        33,
+        13,
+        66
+      ]
+    ]
+  },
+  "mcnemar": {
+    "noisy_or_vs_majority": {
+      "b": 106,
+      "c": 34,
+      "p_value": 8.301174583253661e-10
+    },
+    "noisy_or_vs_max_conf": {
+      "b": 0,
+      "c": 1,
+      "p_value": 1.0
+    },
+    "rerank_vs_no_rerank": {
+      "b": 25,
+      "c": 23,
+      "p_value": 0.8854334972865135
+    },
+    "oracle_vs_retrieved": {
+      "b": 24,
+      "c": 5,
+      "p_value": 0.0005461126565933228
+    }
+  },
+  "errors_fixed_by_oracle": {
+    "n_errors": 93,
+    "fixed": 24,
+    "share": 0.25806451612903225
+  },
+  "latency_ms_per_claim": {
+    "p50": 627.755,
+    "p95": 783.4955
+  }
+}

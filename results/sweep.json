@@ -1,0 +1,38 @@
+[
+  {
+    "batch_size": 16,
+    "epochs": 3,
+    "lr": 1e-05,
+    "dev_macro_f1": 0.8238349885408708
+  },
+  {
+    "batch_size": 16,
+    "epochs": 3,
+    "lr": 2e-05,
+    "dev_macro_f1": 0.828791490922428
+  },
+  {
+    "batch_size": 16,
+    "epochs": 3,
+    "lr": 5e-05,
+    "dev_macro_f1": 0.8578154163730979
+  },
+  {
+    "batch_size": 16,
+    "epochs": 5,
+    "lr": 1e-05,
+    "dev_macro_f1": 0.842388588867462
+  },
+  {
+    "batch_size": 16,
+    "epochs": 5,
+    "lr": 2e-05,
+    "dev_macro_f1": 0.8547277898249668
+  },
+  {
+    "batch_size": 16,
+    "epochs": 5,
+    "lr": 5e-05,
+    "dev_macro_f1": 0.8550637894264789
+  }
+]

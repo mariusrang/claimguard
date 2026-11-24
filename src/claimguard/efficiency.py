@@ -9,6 +9,7 @@ I measure all three (size, latency, accuracy) instead of assuming.
 from __future__ import annotations
 
 import io
+import re
 import time
 from collections.abc import Callable
 
@@ -29,13 +30,34 @@ def model_size_mb(model) -> float:
     return buffer.getbuffer().nbytes / 1e6
 
 
-def quantize_dynamic_int8(model):
-    """Return an INT8 copy of the model (Linear layers only, CPU only)."""
+# feed-forward layers of a transformer block: "...layer.3.intermediate.dense" and "...layer.3.output.dense"
+# (NOT "...layer.3.attention.output.dense", which belongs to the attention)
+_FFN_LAYER = re.compile(r"\.layer\.\d+\.(intermediate|output)\.dense$")
+
+
+def quantize_dynamic_int8(model, only_feed_forward: bool = False):
+    """Return an INT8 copy of the model (Linear layers, CPU only).
+
+    only_feed_forward=False: every Linear layer (the classic recipe).
+    only_feed_forward=True : only the feed-forward layers of each block. On Kaggle the
+    full recipe dropped the accuracy of the verifier from 0.856 to 0.407 (gold evidence):
+    DeBERTa's attention projections are too sensitive. The feed-forward layers hold
+    about 2/3 of the encoder weights, so most of the gain should stay.
+    """
+    import copy
+
     import torch
 
     # the function moved between torch versions, so look in both places
-    quantize = getattr(getattr(torch, "ao", torch), "quantization", torch.quantization).quantize_dynamic
-    return quantize(model.cpu(), {torch.nn.Linear}, dtype=torch.qint8)
+    quant = getattr(getattr(torch, "ao", torch), "quantization", torch.quantization)
+    model = copy.deepcopy(model).cpu()  # never modify the model we were given
+    if not only_feed_forward:
+        return quant.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+    names = {n for n, m in model.named_modules() if isinstance(m, torch.nn.Linear) and _FFN_LAYER.search(n)}
+    if not names:
+        raise ValueError("no feed-forward layer found (unexpected model architecture)")
+    spec = {name: quant.default_dynamic_qconfig for name in names}
+    return quant.quantize_dynamic(model, spec, dtype=torch.qint8)
 
 
 def benchmark(fn: Callable[[], object], n_warmup: int = 3, n_runs: int = 30) -> dict:

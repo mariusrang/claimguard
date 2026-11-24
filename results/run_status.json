@@ -1,0 +1,116 @@
+[
+  {
+    "step": "unit tests",
+    "ok": true,
+    "minutes": 0.6,
+    "error": null
+  },
+  {
+    "step": "data",
+    "ok": true,
+    "minutes": 0.0,
+    "error": null
+  },
+  {
+    "step": "sweep",
+    "ok": false,
+    "minutes": 38.1,
+    "error": "usr/local/lib/python3.13/dist-packages/torch/nn/modules/module.py\", line 1790, in _call_impl\n    return forward_call(*args, **kwargs)\n  File \"/usr/local/lib/python3.13/dist-packages/transformers/models/deberta_v2/modeling_deberta_v2.py\", line 246, in forward\n    rel_att = self.disentangled_attention_bias(\n        query_layer, key_layer, relative_pos, rel_embeddings, scale_factor\n    )\n  File \"/usr/local/lib/python3.13/dist-packages/transformers/models/deberta_v2/modeling_deberta_v2.py\", line 338, in disentangled_attention_bias\n    p2c_att = torch.gather(\n              ~~~~~~~~~~~~^\n        p2c_att,\n        ^^^^^^^^\n        dim=-1,\n        ^^^^^^^\n        index=p2c_pos.squeeze(0).expand([query_layer.size(0), key_layer.size(-2), key_layer.size(-2)]),\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ).transpose(-1, -2)\n    ^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 136.00 MiB. GPU 0 has a total capacity of 14.56 GiB of which 42.81 MiB is free. Including non-PyTorch memory, this process has 14.52 GiB memory in use. Of the allocated memory 13.78 GiB is allocated by PyTorch, and 619.46 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)\n"
+  },
+  {
+    "step": "train 3 seeds",
+    "ok": true,
+    "minutes": 23.3,
+    "error": null
+  },
+  {
+    "step": "calibration + dev choices",
+    "ok": true,
+    "minutes": 5.9,
+    "error": null
+  },
+  {
+    "step": "main pipeline + ablations",
+    "ok": true,
+    "minutes": 4.5,
+    "error": null
+  },
+  {
+    "step": "pipeline seed 13",
+    "ok": true,
+    "minutes": 5.8,
+    "error": null
+  },
+  {
+    "step": "pipeline seed 42",
+    "ok": true,
+    "minutes": 5.8,
+    "error": null
+  },
+  {
+    "step": "pipeline seed 2026",
+    "ok": true,
+    "minutes": 5.8,
+    "error": null
+  },
+  {
+    "step": "train plain encoder",
+    "ok": true,
+    "minutes": 8.1,
+    "error": null
+  },
+  {
+    "step": "pipeline plain encoder",
+    "ok": true,
+    "minutes": 5.7,
+    "error": null
+  },
+  {
+    "step": "stress contrast",
+    "ok": true,
+    "minutes": 0.3,
+    "error": null
+  },
+  {
+    "step": "stress climate",
+    "ok": true,
+    "minutes": 1.2,
+    "error": null
+  },
+  {
+    "step": "stress french",
+    "ok": true,
+    "minutes": 0.2,
+    "error": null
+  },
+  {
+    "step": "efficiency FP32 vs INT8",
+    "ok": true,
+    "minutes": 4.7,
+    "error": null
+  },
+  {
+    "step": "aggrefact fine-tuned",
+    "ok": true,
+    "minutes": 1.7,
+    "error": null
+  },
+  {
+    "step": "errors export",
+    "ok": true,
+    "minutes": 0.0,
+    "error": null
+  },
+  {
+    "step": "tables",
+    "ok": true,
+    "minutes": 0.0,
+    "error": null
+  },
+  {
+    "step": "figures",
+    "ok": true,
+    "minutes": 0.0,
+    "error": null
+  }
+]

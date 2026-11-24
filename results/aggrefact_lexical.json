@@ -1,0 +1,56 @@
+{
+  "verifier": "lexical-rules",
+  "n": 1100,
+  "by_dataset": {
+    "AggreFact-CNN": {
+      "n": 100,
+      "balanced_accuracy": 0.5222222222222221
+    },
+    "AggreFact-XSum": {
+      "n": 100,
+      "balanced_accuracy": 0.6774709883953581
+    },
+    "ClaimVerify": {
+      "n": 100,
+      "balanced_accuracy": 0.6566152407667134
+    },
+    "ExpertQA": {
+      "n": 100,
+      "balanced_accuracy": 0.5864978902953586
+    },
+    "FactCheck-GPT": {
+      "n": 100,
+      "balanced_accuracy": 0.5841514726507714
+    },
+    "Lfqa": {
+      "n": 100,
+      "balanced_accuracy": 0.7164307164307164
+    },
+    "RAGTruth": {
+      "n": 100,
+      "balanced_accuracy": 0.6799242424242424
+    },
+    "Reveal": {
+      "n": 100,
+      "balanced_accuracy": 0.6642857142857143
+    },
+    "TofuEval-MediaS": {
+      "n": 100,
+      "balanced_accuracy": 0.6095238095238096
+    },
+    "TofuEval-MeetB": {
+      "n": 100,
+      "balanced_accuracy": 0.7620614035087719
+    },
+    "Wice": {
+      "n": 100,
+      "balanced_accuracy": 0.5119047619047619
+    }
+  },
+  "mean_balanced_accuracy": 0.6337353147644036,
+  "pooled_balanced_accuracy": 0.6299957198186317,
+  "latency_ms_per_claim": {
+    "p50": 0.7,
+    "p95": 1.5
+  }
+}
