@@ -12,24 +12,20 @@ fontsize: 10.5pt
 ## Abstract
 
 Language models produce fluent answers that are not always supported by their
-sources. We present ClaimGuard, a pipeline that verifies a claim against a document
+sources. We present ClaimGuard, a pipeline that checks a claim against a document
 collection and returns SUPPORTED, REFUTED or NOT ENOUGH INFO with the evidence and a
-calibrated confidence. The pipeline combines hybrid retrieval (BM25 and a dense
-encoder fused with Reciprocal Rank Fusion), cross-encoder reranking, a DeBERTa-v3
-verifier fine-tuned on SciFact, multi-evidence aggregation and temperature scaling.
-On the SciFact test set the full system reaches 0.693 ± 0.010 macro-F1 (3 seeds),
-against 0.609 for a zero-shot NLI baseline and 0.671 for a 7B open-source LLM judge
-that is 26 times slower. With gold evidence, macro-F1 rises to 0.743: retrieval
-causes some errors, but the verifier is the main bottleneck. On sentences written by
-LLMs (LLM-AggreFact) the verifier reaches a mean balanced accuracy of 0.709. After
-temperature scaling the expected calibration error drops from 0.260 to 0.141, and
-with a threshold of 0.8 the alerts are right 90.5% of the time for a coverage of 70%.
-A contrast set shows that the verifier catches 97% of negation edits but only 30% of
-changed numbers. A manual analysis of 110 errors finds that the most frequent failure
-is treating evidence on the right topic as proof. The system ships with a demo, a
-Docker image and an MCP server with an audit log.
-
-<!-- 150-200 words once the numbers are in -->
+calibrated confidence. It combines hybrid retrieval (BM25 and a dense encoder fused with
+Reciprocal Rank Fusion), cross-encoder reranking, a DeBERTa-v3 verifier fine-tuned on
+SciFact, noisy-OR aggregation and temperature scaling. On the SciFact test set it
+reaches 0.693 ± 0.010 macro-F1 over 3 seeds, against 0.609 for a zero-shot NLI baseline
+and 0.671 for a 7B open-source LLM judge that is 26 times slower. Gold evidence raises
+macro-F1 to 0.743, so most errors come from the verifier, not from retrieval.
+Temperature scaling cuts the expected calibration error from 0.260 to 0.141, and at a
+threshold of 0.8, 90.5% of the alerts are correct for a coverage of 70%. A contrast set
+shows that the verifier catches 97% of negation edits but only 30% of number edits, and
+a manual analysis of 110 errors finds that its most frequent confusion is treating
+evidence on the right topic as proof. The system ships with a demo, a Docker image and
+an MCP server.
 
 ## 1. Introduction
 
@@ -295,7 +291,7 @@ Table 4 – Ablations on the main system (macro-F1 on test).
 
 **A2.** The reranker improves retrieval (Table 1). Individual verdicts change in both directions:
 McNemar b = 20, c = 21, p = 1.0. Moving a relevant abstract into the top 5 can improve retrieval even if the selected sentences still leave the decisive detail out. The paired counts show that gains and losses nearly cancel.
-**A3.** k barely matters between 1 and 5 (Figure `ablation_k.png`); k = 10 loses a
+**A3.** k barely matters between 1 and 5 (Figure A1 in the appendix); k = 10 loses a
 little because more neutral passages enter the aggregation. k = 3 was chosen on dev.
 **A4.** This is the largest effect of the study. The majority baseline scores
 0.369, because several neutral passages can outweigh a passage that clearly supports or refutes the claim. Noisy-OR pools evidence for support and refutation across passages, so a single decisive passage can carry substantial weight (noisy-OR vs majority: b = 106, c = 37, p < 0.0001; noisy-OR vs
@@ -310,7 +306,10 @@ net gain of 19 (McNemar p = 0.0005), and macro-F1 rises to 0.743. Providing gold
 
 The raw model is over-confident: before scaling, ECE is 0.260. Temperature scaling
 with T = 2.42 (fitted on dev, at the claim level) reduces it by 46% to 0.141
-(Figure `reliability.png`). The area under the risk–coverage curve (AURC) rises from 0.142 to 0.153. Lower is better: this measure tracks errors among the claims retained as the confidence threshold varies. Scaling before noisy-OR can change the confidence ranking even as calibration improves.
+(Figure 1, left). The area under the risk–coverage curve (AURC) rises from 0.142 to 0.153. Lower is better: this measure tracks errors among the claims retained as the confidence threshold varies. Scaling before noisy-OR can change the confidence ranking even as calibration improves.
+
+
+![Figure 1 – Reliability diagram before and after temperature scaling (left) and risk-coverage curve (right), SciFact test.](../results/figures/calibration.png){width=80%}
 
 Table 5 – Abstention after temperature scaling. An alert is a REFUTED or NEI verdict.
 
@@ -326,7 +325,7 @@ Macro-F1 in Tables 3–4 is always computed on the model's best guess; UNCERTAIN
 answers only appear here. The threshold of 0.5 chosen on dev answers 98% of the
 claims. A user who wants alerts that are right 9 times out of 10 can move to 0.8 and
 keep 70% coverage, at the cost of missing about half of the problems (alert recall
-0.540). Figure `risk_coverage.png` shows the whole trade-off.
+0.540). Figure 1 (right) shows the whole trade-off.
 
 ### 4.6 Stress tests
 
@@ -367,42 +366,19 @@ is better than the multilingual model.
 
 ### 4.7 Sentences written by LLMs
 
-Table 8 – LLM-AggreFact, balanced accuracy, 100 claims per sub-dataset.
+Table A1 in the appendix gives the balanced accuracy on each of the 11 sub-datasets (100 claims each).
 
-| Sub-dataset | Fine-tuned | Zero-shot NLI | Rules |
-| --- | --- | --- | --- |
-| AggreFact-CNN | 0.583 | **0.739** | 0.522 |
-| AggreFact-XSum | 0.603 | 0.666 | **0.677** |
-| TofuEval-MediaS | 0.638 | **0.686** | 0.610 |
-| TofuEval-MeetB | **0.796** | 0.795 | 0.762 |
-| Wice | 0.659 | **0.712** | 0.512 |
-| ExpertQA | 0.574 | 0.539 | **0.586** |
-| ClaimVerify | **0.732** | 0.695 | 0.657 |
-| FactCheck-GPT | 0.733 | **0.740** | 0.584 |
-| Lfqa | **0.860** | 0.800 | 0.716 |
-| RAGTruth | **0.769** | 0.748 | 0.680 |
-| Reveal | **0.850** | 0.812 | 0.664 |
-| **Mean** | 0.709 | **0.721** | 0.634 |
-
-On average, fine-tuning on SciFact does not help on LLM outputs (0.709 vs 0.721). The
+On average, fine-tuning on SciFact does not help on LLM outputs (mean balanced accuracy 0.709 for the fine-tuned verifier, 0.721 zero-shot, 0.634 rules). The
 picture depends on the kind of text: the fine-tuned model is better on the RAG and
 long-form QA sets (Lfqa, RAGTruth, Reveal, ClaimVerify), where a sentence is checked
 against retrieved passages as in SciFact, and worse on summaries of news and of
-dialogues (AggreFact-CNN −0.16, TofuEval-MediaS −0.05). With 100 claims per
+dialogues (AggreFact-CNN 0.583 vs 0.739, TofuEval-MediaS 0.638 vs 0.686). With 100 claims per
 sub-dataset, small differences should be interpreted cautiously.
 
 ### 4.8 Efficiency
 
-Table 9 – Verifier on CPU (one claim = 5 passages, 30 runs), gold-evidence accuracy
-on 209 pairs.
-
-| Version | Size | p50 | p95 | Accuracy |
-| --- | --- | --- | --- | --- |
-| FP32 (184M parameters) | 738 MB | 1,037 ms | 1,103 ms | **0.856** |
-| INT8 dynamic, all linear layers | 481 MB | 918 ms | 954 ms | 0.407 |
-| INT8 dynamic, feed-forward only | 568 MB | 949 ms | 996 ms | 0.455 |
-
-On GPU the full pipeline takes 627 ms per claim (p50; p95 790 ms). Dynamic INT8
+On CPU, the FP32 verifier takes 1,037 ms per claim (p50, 5 passages; p95 1,103 ms)
+and weighs 738 MB for 184M parameters (Table A2 in the appendix). On GPU the full pipeline takes 627 ms per claim (p50; p95 790 ms). Dynamic INT8
 quantization saves 35% of the size but only 11% of median CPU inference time. Accuracy drops sharply,
 even when the attention layers are kept in FP32. We kept FP32: at about one second
 per claim on CPU, the demo is usable without a GPU.
@@ -414,27 +390,30 @@ set (95 errors) and add the 15 errors of a random sample of Climate-FEVER, which
 gives 110 errors. Each error is first tagged automatically: *retrieval miss* (the
 claim has gold evidence and none of it reached the verifier) or *verification
 error*, presence of a number, presence of a negation. Then each error receives one
-category (taxonomy in Table 10), with a short note justifying it. The annotation was
+category (taxonomy in Table 8), with a short note justifying it. The annotation was
 done with the help of an AI assistant; the categories and notes were then reviewed.
 To check the consistency of the categories, 25 errors drawn at random were annotated a second time by the author alone, without AI assistance and without access to the first labels, the same day a few hours after the first pass. The two passes agree on 24 of the 25 errors (96%), Cohen's κ = 0.95 (`results/kappa.json`). The only change is claim 1280, moved from domain vocabulary to related but insufficient, two categories that overlap when a technical term hides a missing link. The short delay probably inflates the agreement, so this number shows that the categories are usable, not that they are fully reliable.
 
 ### 5.1 Quantitative breakdown
 
-Table 10 – Error categories (110 errors).
+Table 8 – Error categories (110 errors).
 
 | Category | Definition | SciFact | Climate | Total | Main confusion |
 | --- | --- | --- | --- | --- | --- |
-| Wrong sentences | right document, but the sentences given to the verifier are not the ones that decide | 25 | 7 | 32 (29%) | SUPPORTED → NEI |
-| Related but insufficient | the model predicts SUPPORTED from related evidence that fails to establish an essential part of the claim | 17 | 2 | 19 (17%) | NEI → SUPPORTED |
-| REFUTED vs NEI | evidence goes against the claim without contradicting it, or the reverse | 11 | 4 | 15 (14%) | NEI → REFUTED |
-| Domain vocabulary | the decision depends on a technical term or relation the model misreads | 15 | 0 | 15 (14%) | NEI → SUPPORTED |
+| Wrong sentences | right document, wrong sentences given to the verifier | 25 | 7 | 32 (29%) | SUPPORTED → NEI |
+| Related but insufficient | related evidence read as proof of an essential part it does not establish | 17 | 2 | 19 (17%) | NEI → SUPPORTED |
+| REFUTED vs NEI | evidence weighs against the claim without contradicting it, or the reverse | 11 | 4 | 15 (14%) | NEI → REFUTED |
+| Domain vocabulary | a technical term or relation is misread | 15 | 0 | 15 (14%) | NEI → SUPPORTED |
 | Evidence not retrieved | no gold document reached the verifier | 9 | 0 | 9 (8%) | REFUTED → NEI |
-| Numbers | wrong reading of a number, unit or statistical result | 4 | 1 | 5 (5%) | SUPPORTED → NEI |
-| Multi-sentence evidence | the proof needs two sentences together | 5 | 0 | 5 (5%) | SUPPORTED → NEI |
-| Negation / quantifier | wrong scope of "not", "no evidence", "often" | 4 | 1 | 5 (5%) | REFUTED → SUPPORTED |
-| Gold label questionable | our reading of the evidence disagrees with the gold label | 5 | 0 | 5 (5%) | NEI → SUPPORTED |
+| Numbers | number, unit or statistical result misread | 4 | 1 | 5 (5%) | SUPPORTED → NEI |
+| Multi-sentence evidence | proof needs two sentences together | 5 | 0 | 5 (5%) | SUPPORTED → NEI |
+| Negation / quantifier | scope of "not", "no evidence", "often" | 4 | 1 | 5 (5%) | REFUTED → SUPPORTED |
+| Gold label questionable | our reading disagrees with the gold label | 5 | 0 | 5 (5%) | NEI → SUPPORTED |
 
-Figure `errors.png` shows the same counts. Three numbers stand out.
+
+![Figure 2 – Error categories over the 110 annotated errors.](../results/figures/errors.png){width=52%}
+
+Figure 2 shows the same counts. Three numbers stand out.
 
 * **Errors are made with confidence.** 44 of the 110 errors have a confidence of at
   least 0.8 (mean 0.728 over the 110, 0.746 over the 95 SciFact errors). A threshold
@@ -554,3 +533,39 @@ We'd start by checking confidence separately for different kinds of claims. An a
 18. Xiao, S., Liu, Z., Zhang, P., Muennighoff, N. (2023). C-Pack: Packaged Resources To Advance General Chinese Embedding. arXiv:2309.07597.
 
 <!-- Before submitting: open each reference on Google Scholar and check authors, year and venue. -->
+
+## Appendix
+
+Table A1 – LLM-AggreFact, balanced accuracy per sub-dataset, 100 claims each.
+
+| Sub-dataset | Fine-tuned | Zero-shot NLI | Rules |
+| --- | --- | --- | --- |
+| AggreFact-CNN | 0.583 | **0.739** | 0.522 |
+| AggreFact-XSum | 0.603 | 0.666 | **0.677** |
+| TofuEval-MediaS | 0.638 | **0.686** | 0.610 |
+| TofuEval-MeetB | **0.796** | 0.795 | 0.762 |
+| Wice | 0.659 | **0.712** | 0.512 |
+| ExpertQA | 0.574 | 0.539 | **0.586** |
+| ClaimVerify | **0.732** | 0.695 | 0.657 |
+| FactCheck-GPT | 0.733 | **0.740** | 0.584 |
+| Lfqa | **0.860** | 0.800 | 0.716 |
+| RAGTruth | **0.769** | 0.748 | 0.680 |
+| Reveal | **0.850** | 0.812 | 0.664 |
+| **Mean** | 0.709 | **0.721** | 0.634 |
+
+
+Table A2 – Verifier on CPU (one claim = 5 passages, 30 runs), gold-evidence accuracy
+on 209 pairs.
+
+| Version | Size | p50 | p95 | Accuracy |
+| --- | --- | --- | --- | --- |
+| FP32 (184M parameters) | 738 MB | 1,037 ms | 1,103 ms | **0.856** |
+| INT8 dynamic, all linear layers | 481 MB | 918 ms | 954 ms | 0.407 |
+| INT8 dynamic, feed-forward only | 568 MB | 949 ms | 996 ms | 0.455 |
+
+
+![Figure A1 – Macro-F1 on test for k = 1, 3, 5, 10 evidence passages, with 95% bootstrap intervals.](../results/figures/ablation_k.png){width=55%}
+
+![Figure A2 – The demo: each claim of an LLM answer is underlined by verdict, and the margin shows the source sentence; for a contradicted claim, a diff marks the words that differ.](../results/figures/demo.png){width=95%}
+
+![Figure A3 – ClaimGuard used as an MCP tool inside Claude Desktop, with the fine-tuned verifier running locally.](../results/figures/mcp_claude_desktop.png){width=70%}
