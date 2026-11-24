@@ -433,6 +433,9 @@ mark { background: #E6EBF2; color: inherit; padding: 0 1px; border-radius: 2px; 
 .cg-legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--soft); margin: 8px 2px 0; }
 .tabs button.selected, button[role='tab'][aria-selected='true'] { color: var(--ink) !important; font-weight: 600; }
 .tabs button.selected::after, button[role='tab'][aria-selected='true']::after { background: var(--ink) !important; }
+footer { display: none !important; }
+.cg-inputs label span, .cg-inputs .label-wrap span { color: var(--ink); }
+.cg-legend .claim { color: var(--ink); }
 @media (max-width: 860px) {
   .cg-page { grid-template-columns: 1fr; padding: 20px; }
   .cg-margin { padding-left: 0; border-left: 0; border-top: 1px solid var(--rule); padding-top: 16px; }
@@ -479,7 +482,14 @@ EMPTY_ANSWER = (
 EMPTY_CLAIM = "<div class='cg-empty'>Type one factual sentence to see which passages support or contradict it.</div>"
 
 # Gradio 6 moved theme / css / head from Blocks() to launch(); support both
-_STYLE = {"theme": THEME, "css": CSS, "head": HEAD}
+FORCE_LIGHT = """() => {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('__theme') !== 'light') {
+    url.searchParams.set('__theme', 'light');
+    window.location.replace(url.href);
+  }
+}"""
+_STYLE = {"theme": THEME, "css": CSS, "head": HEAD, "js": FORCE_LIGHT}
 _BLOCKS_STYLE = {k: v for k, v in _STYLE.items() if k in inspect.signature(gr.Blocks.__init__).parameters}
 _LAUNCH_STYLE = {k: v for k, v in _STYLE.items() if k not in _BLOCKS_STYLE}
 
@@ -492,48 +502,53 @@ with gr.Blocks(title="ClaimGuard", **_BLOCKS_STYLE) as demo:
     if STARTUP_NOTE:
         gr.HTML(f"<div class='cg-startup'>{html.escape(STARTUP_NOTE)}</div>")
 
-    with gr.Tabs(selected=os.environ.get("CLAIMGUARD_PREVIEW", "answer")) as tabs:
+    with gr.Tabs(selected=os.environ.get("CLAIMGUARD_PREVIEW", "answer")):
         with gr.Tab("Check an answer", id="answer"):
             with gr.Row(equal_height=False):
-                with gr.Column(scale=4, min_width=300):
-                    answer_in = gr.Textbox(label="Answer written by an AI", lines=6)
-                    src2_in = gr.Textbox(label="Source documents", lines=7,
-                                         info="Leave a blank line between two documents.")
-                    src2_file = gr.File(label="Or upload a .txt file", file_types=[".txt", ".md"], type="filepath")
-                    thr2 = gr.Slider(0.0, 0.95, value=PIPELINE.threshold, step=0.05,
-                                     label="Abstain below this confidence")
-                    btn2 = gr.Button("Check the answer", variant="primary")
-                    gr.Examples(examples=[[ANSWER_EXAMPLE, SOURCE_EXAMPLE]], inputs=[answer_in, src2_in],
-                                label="Example: a mortgage answer with two mistakes")
+                with gr.Column(scale=4, min_width=300, elem_classes="cg-inputs"):
+                    answer_in = gr.Textbox(label="Answer written by an AI", lines=6,
+                                           placeholder="Paste the answer of a chatbot here")
+                    src2_in = gr.Textbox(label="Source documents", lines=6,
+                                         placeholder="Paste the documents the answer should rely on. "
+                                                     "Leave a blank line between two documents.")
+                    with gr.Row():
+                        ex2 = gr.Button("Load an example", variant="secondary")
+                        btn2 = gr.Button("Check the answer", variant="primary")
+                    with gr.Accordion("More options", open=False):
+                        src2_file = gr.File(label="Sources as a .txt file", file_types=[".txt", ".md"],
+                                            type="filepath", height=90)
+                        thr2 = gr.Slider(0.0, 0.95, value=PIPELINE.threshold, step=0.05,
+                                         label="Say \"unsure\" below this confidence")
                 with gr.Column(scale=7, min_width=380):
                     summary = gr.HTML()
                     page = gr.HTML(EMPTY_ANSWER)
                     gr.HTML(LEGEND)
                     with gr.Accordion("Claims as a table", open=False):
                         table = gr.Dataframe(headers=["#", "claim", "verdict", "confidence"], wrap=True)
+            ex2.click(lambda: (ANSWER_EXAMPLE, SOURCE_EXAMPLE), None, [answer_in, src2_in])
             btn2.click(check_answer_ui, [answer_in, src2_in, src2_file, thr2], [summary, page, table])
 
         with gr.Tab("Check one claim", id="claim"):
+            examples = {text[:90] + ("..." if len(text) > 90 else ""): (text, src)
+                        for text, src in corpus_examples() + [[EXAMPLE_CLAIM, SOURCE_EXAMPLE]]}
             with gr.Row(equal_height=False):
-                with gr.Column(scale=4, min_width=300):
+                with gr.Column(scale=4, min_width=300, elem_classes="cg-inputs"):
                     claim_in = gr.Textbox(label="Claim", lines=2, placeholder="One factual sentence")
                     src_in = gr.Textbox(label="Source documents (optional)", lines=5,
-                                        info="Leave empty to search the indexed scientific abstracts.")
-                    src_file = gr.File(label="Or upload a .txt file", file_types=[".txt", ".md"], type="filepath")
-                    thr = gr.Slider(0.0, 0.95, value=PIPELINE.threshold, step=0.05,
-                                    label="Abstain below this confidence")
-                    topk = gr.Slider(1, 10, value=PIPELINE.top_k, step=1, label="Passages to read")
+                                        placeholder="Leave empty to search the 5,183 scientific abstracts "
+                                                    "of SciFact.")
+                    pick = gr.Dropdown(list(examples), label="Or pick an example", value=None)
                     btn = gr.Button("Check the claim", variant="primary")
-                    gr.Examples(
-                        examples=corpus_examples()
-                        + [[EXAMPLE_CLAIM, SOURCE_EXAMPLE]],
-                        inputs=[claim_in, src_in],
-                        label="Examples from the SciFact test set, then one with your own document",
-                    )
+                    with gr.Accordion("More options", open=False):
+                        src_file = gr.File(label="Sources as a .txt file", file_types=[".txt", ".md"],
+                                           type="filepath", height=90)
+                        thr = gr.Slider(0.0, 0.95, value=PIPELINE.threshold, step=0.05,
+                                        label="Say \"unsure\" below this confidence")
+                        topk = gr.Slider(1, 10, value=PIPELINE.top_k, step=1, label="Passages to read")
                 with gr.Column(scale=7, min_width=380):
                     card = gr.HTML(EMPTY_CLAIM)
-                    with gr.Accordion("Raw probabilities", open=False):
-                        probs = gr.Label(num_top_classes=3, show_label=False)
+                    probs = gr.State()  # the probabilities are already drawn in the card
+            pick.change(lambda key: examples.get(key, ("", "")), pick, [claim_in, src_in])
             btn.click(verify_claim_ui, [claim_in, src_in, src_file, thr, topk], [card, probs])
 
         with gr.Tab("Audit log", id="audit"):

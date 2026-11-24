@@ -94,6 +94,8 @@ class DenseIndex:
             if cache_file.exists():
                 self.matrix = np.load(cache_file)
                 return self
+        # first run only: on a laptop CPU this takes several minutes, so say it
+        print(f"Embedding {len(texts)} documents for the dense index (first run only, cached after)...", flush=True)
         self.matrix = self.encoder.encode(texts).astype(np.float32)
         if cache_file is not None:
             cache_file.parent.mkdir(parents=True, exist_ok=True)
