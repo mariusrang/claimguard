@@ -67,47 +67,33 @@ supported **by the documents**. It does not know if the documents are right.
 
 ## 2. Related Work
 
-**Fact verification datasets.** FEVER (Thorne et al., 2018) defined the task at scale
-with 185k claims verified against Wikipedia and a score that requires both the right
-label and the right evidence. SciFact (Wadden et al., 2020) moved the task to
-scientific claims checked against abstracts, with sentence-level rationales.
-Climate-FEVER (Diggelmann et al., 2020) collected real-world climate claims and is
-often used as an out-of-domain test. Schuster et al. (2019) showed that FEVER claims
-alone, without evidence, already predict the label well above chance, which is why we
-include a claim-only baseline.
+**Fact verification.** FEVER (Thorne et al., 2018) defined the task at scale, scoring
+both the label and the evidence; SciFact (Wadden et al., 2020) moved it to scientific
+abstracts with sentence-level rationales, and Climate-FEVER (Diggelmann et al., 2020)
+to real-world climate claims. Claims alone already predict FEVER labels well above
+chance (Schuster et al., 2019), hence our claim-only baseline.
 
-**Retrieval.** BM25 (Robertson and Zaragoza, 2009) remains a strong lexical baseline.
-Dense bi-encoders (Karpukhin et al., 2020) match meaning instead of words, and
-general-purpose models such as BGE (Xiao et al., 2023) need no task-specific training. Lexical and dense rankings fail on different queries,
-and Reciprocal Rank Fusion (Cormack et al., 2009) combines them using ranks only.
-Cross-encoders (Nogueira and Cho, 2019), usually trained on MS MARCO (Nguyen et al.,
-2016), read the query and the passage together and are the usual second stage.
+**Retrieval and verification.** BM25 (Robertson and Zaragoza, 2009) remains a strong
+lexical baseline; dense bi-encoders (Karpukhin et al., 2020) such as BGE (Xiao et al.,
+2023) match meaning, and Reciprocal Rank Fusion (Cormack et al., 2009) combines both
+using ranks only. Cross-encoders trained on MS MARCO (Nogueira and Cho, 2019; Nguyen et
+al., 2016) are the usual second stage. Verification is close to natural language
+inference: models trained on MultiNLI and ANLI (Williams et al., 2018; Nie et al., 2020)
+transfer well (Laurer et al., 2024), DeBERTa-v3 (He et al., 2023) is a strong encoder
+for sentence pairs, and on SciFact MultiVerS (Wadden et al., 2022) reads the full abstract.
 
-**Verification.** Verification is close to natural language inference, and models
-pre-trained on NLI data such as MultiNLI (Williams et al., 2018) and ANLI (Nie et al.,
-2020) transfer well (Laurer et al., 2024). DeBERTa-v3 (He et al.,
-2023) is a strong encoder for this kind of sentence-pair task. On SciFact, MultiVerS
-(Wadden et al., 2022) predicts the label and the rationales jointly from the full
-abstract and uses weak supervision from other datasets.
+**Multi-hop verification.** HoVer (Jiang et al., 2020) turned the multi-hop questions of
+HotpotQA (Yang et al., 2018) into claims that need 2 to 4 articles, and showed that
+models matching the claim with one passage at a time degrade as hops grow. Multi-hop
+dense retrieval (Xiong et al., 2021) builds each query from the passages found before.
 
-**Multi-hop verification.** Some claims can only be checked by combining several
-documents. HotpotQA (Yang et al., 2018) introduced multi-hop questions over Wikipedia,
-and HoVer (Jiang et al., 2020) turned them into claims that need 2 to 4 articles,
-showing that models which match the claim with one passage at a time degrade as the
-number of hops grows. Multi-hop dense retrieval (Xiong et al., 2021) retrieves
-iteratively, using the passages found in one round to build the next query.
-
-**Checking LLM outputs.** FActScore (Min et al., 2023) splits a generated text into
-atomic facts and checks each one. SummaC (Laban et al., 2022) revisited NLI models
-for inconsistency detection in summaries. MiniCheck (Tang et al., 2024) trains small
-models that match GPT-4-class judges on LLM-AggreFact at a much lower cost. Our verifier
-belongs to the same family; we do not claim a better checker.
-
-**Calibration and robustness.** Modern networks are over-confident, and temperature
-scaling is a simple and effective fix (Guo et al., 2017). Selective classification
-studies the trade-off between coverage and risk when a model may abstain (Geifman and
-El-Yaniv, 2017). Contrast sets (Gardner et al., 2020) test a model with small,
-meaning-changing edits of test examples.
+**Checking LLM outputs, calibration.** FActScore (Min et al., 2023) checks the atomic
+facts of a generated text, SummaC (Laban et al., 2022) uses NLI for summaries, and
+MiniCheck (Tang et al., 2024) trains small checkers that match GPT-4-class judges on
+LLM-AggreFact; our verifier belongs to this family. Temperature scaling fixes
+over-confidence (Guo et al., 2017), selective classification studies abstention
+(Geifman and El-Yaniv, 2017), and contrast sets test small meaning-changing edits
+(Gardner et al., 2020).
 
 ## 3. Methodology
 
@@ -270,12 +256,9 @@ and once the reranker is applied dense and hybrid reach nearly the same R@5 (0.9
 
 ### 4.2 Hyperparameter search
 
-Table A3 in the appendix gives the dev macro-F1 of the six settings (batch size 16, one seed each).
-
-Batch size 32 was planned but did not fit in the T4 memory in float32. All six runs
-are within 0.034 of each other, and the best one (5e-5, 3 epochs) is only 0.003 above
-our default (2e-5, 5 epochs), a small difference in a single-seed search. We kept the
-default and evaluated it across three seeds.
+Six settings at batch size 16 lie within 0.034 dev macro-F1 (Table A3; batch 32 did not fit
+in T4 memory). The best (5e-5, 3 epochs) beats our default (2e-5, 5 epochs) by 0.003, less
+than the seed noise, so we kept the default for the 3 seeds.
 
 ### 4.3 Main results and baselines
 
@@ -288,30 +271,27 @@ Table 2 – End-to-end results on SciFact test (300 claims); brackets: 95% boots
 | Rules | 0.517 | 0.475 [0.422, 0.533] | 0.473 | 0.273 | – |
 | BM25 + zero-shot NLI | 0.580 | 0.570 [0.515, 0.625] | 0.543 | 0.253 | 0.05 s |
 | Full retr. + zero-shot NLI | 0.617 | 0.609 [0.550, 0.667] | 0.583 | 0.340 | 0.37 s |
-| Full retr. + LLM judge (Qwen-7B) | 0.687 | 0.671 [0.612, 0.722] | 0.643 | 0.350 | LLMTIME |
+| Full retr. + LLM judge (Qwen-7B) | 0.687 | 0.671 [0.612, 0.722] | 0.643 | 0.350 | 1.72 s |
 | **ClaimGuard**, 3 seeds (T = 1) | 0.701 ± 0.012 | **0.693 ± 0.012** | 0.672 ± 0.004 | 0.329 ± 0.027 | – |
-| ClaimGuard, main (seed 13, T = 2.42) | 0.683 | 0.676 [0.620, 0.726] | 0.663 | 0.308 | 0.40 s (5.9 s CPU) |
+| ClaimGuard, main (seed 13, T = 2.42) | 0.683 | 0.676 [0.620, 0.726] | 0.663 | 0.308 | 0.42 s (5.9 s CPU) |
 
-FEVER = right label and at least one gold abstract among the evidence (a document-level
-version of the FEVER score, since SciFact rationales are sentence sets); Ev. F1 = F1 of
-the selected evidence sentences against the gold rationales. Time = median per claim
-over 20 test claims, each system with its own k chosen on dev, whole pipeline
-(retrieval, reranking, verification) on a T4; CPU = 2 Kaggle threads, no GPU. The three seeds run with
-T = 1 and each picks its own k and aggregation on dev (seed 42 picks k = 1); the main
-system, used for calibration (Section 4.5), the ablations and the error analysis, is
-seed 13 with the temperature fitted on dev.
+FEVER = right label and a gold abstract among the evidence (document-level, since SciFact
+rationales are sentence sets); Ev. F1 = F1 of the evidence sentences against the gold
+rationales. Time = median per claim over 20 claims, whole pipeline, each system at its own
+k chosen on dev, T4 (CPU: 2 threads). Seeds run with T = 1 and pick their own k and
+aggregation; the main system (calibration, ablations, errors) is seed 13 with T fitted on
+dev. Per class (main): SUPPORTED F1 0.742, REFUTED 0.667, NEI 0.618.
 
-Per class (main system): SUPPORTED F1 0.742, REFUTED 0.667, NEI 0.618.
-
-The claim-only baseline reaches 0.401 without reading any evidence, twice the majority
-class: part of the label can be guessed from the wording alone, as reported for FEVER
-(Schuster et al., 2019). Reading evidence with a zero-shot NLI model adds 0.21, and
-fine-tuning on SciFact another 0.07 (main system vs zero-shot: +0.067 macro-F1, paired
-interval [+0.009, +0.124], McNemar p = 0.04; p ≤ 0.02 for each of the 3 seeds). The
+The claim-only baseline reaches 0.401 without evidence, twice the majority class, as
+reported for FEVER (Schuster et al., 2019). Reading evidence with a zero-shot NLI model
+adds 0.21, and fine-tuning on SciFact another 0.07 (main vs zero-shot: +0.067 macro-F1,
+paired interval [+0.009, +0.124], McNemar p = 0.04; p ≤ 0.02 for each seed). The
 184M-parameter verifier and the 7B LLM judge are on par: +0.005 [−0.055, +0.064],
-McNemar b = 41, c = 42, p = 1.0. LLMSPEED The LLM judge and the zero-shot model pick slightly better evidence sentences
-(evidence F1 0.350 and 0.340 vs 0.308): fine-tuning improved the verdicts more than the
-evidence. NEI is the hardest class (Section 5).
+McNemar b = 41, c = 42, p = 1.0. Each at its own k, the judge takes 1.72 s per claim on
+the same T4 against 0.42 s, four times slower end to end and 30 times for the
+verification step alone (1.36 s vs 0.04 s). The judge and the zero-shot model pick
+slightly better evidence sentences (evidence F1 0.350 and 0.340 vs 0.308): fine-tuning
+improved the verdicts more than the evidence.
 
 ### 4.4 Ablations (A3–A6)
 
@@ -401,50 +381,40 @@ sub-dataset, small differences should be interpreted cautiously.
 
 ### 4.8 Efficiency
 
-On a T4, the whole pipeline takes 0.40 s per claim (median; p95 0.44 s), and 87% of
-it is the cross-encoder reranking (0.35 s), not the verifier (0.04 s for 3 passages).
-On CPU only (2 Kaggle threads) it takes 5.9 s per claim (p95 6.6 s): 5.1 s of
-reranking, 0.67 s of verification. The reranker improves retrieval but not the
-verdicts (A2), so it is the first thing to drop or shrink for a CPU deployment; we did
-not measure that configuration. The verifier weighs 738 MB for 184M parameters
-(Table A2). Dynamic INT8 quantization saves 35% of the size but only 11% of its CPU
-time, and accuracy drops sharply even with the attention layers kept in FP32, so we
-kept FP32.
+On a T4 the pipeline takes 0.42 s per claim (p95 0.47 s); 88% of it is the cross-encoder
+reranking (0.37 s), the verifier needs 0.04 s for 3 passages. On CPU only (2 threads) it
+takes 5.9 s, 5.1 s of it reranking. Since the reranker does not change the verdicts (A2), it
+is the first thing to drop on CPU (not measured). INT8 quantization of the 738 MB verifier
+broke its accuracy for 11% of speed (Table A2): we kept FP32.
 
 ### 4.9 Multi-hop claims (HoVer)
 
 Table 5 – HoVer, 600 dev claims (200 per number of hops, balanced labels, chance = 0.5).
 Accuracy with the gold articles, read one by one (noisy-OR) or together. 95% intervals:
 about ±0.04 on All, ±0.07 per number of hops. HoVer-tuned: mean of 3 seeds (std ≤ 0.01).
+Claim only (TF-IDF + LR, no article): 0.562.
 
 | Reader | Reading | All | 2 hops | 3 hops | 4 hops | + 3 distractors |
 | --- | --- | --- | --- | --- | --- | --- |
 | Zero-shot NLI | one by one | 0.613 | 0.680 | 0.580 | 0.580 | 0.597 |
 | Zero-shot NLI | together | 0.723 | 0.815 | 0.690 | 0.665 | 0.640 |
-| SciFact-tuned (ours) | one by one | 0.620 | 0.700 | 0.585 | 0.575 | 0.617 |
-| SciFact-tuned (ours) | together | 0.677 | 0.740 | 0.660 | 0.630 | 0.620 |
-| HoVer-tuned (ours) | one by one | 0.556 | 0.592 | 0.507 | 0.568 | 0.566 |
-| HoVer-tuned (ours) | together | **0.857** | **0.865** | **0.862** | **0.843** | **0.744** |
-| Claim only (TF-IDF + LR) | – | 0.562 | 0.585 | 0.600 | 0.500 | – |
+| SciFact-tuned | one by one | 0.620 | 0.700 | 0.585 | 0.575 | 0.617 |
+| SciFact-tuned | together | 0.677 | 0.740 | 0.660 | 0.630 | 0.620 |
+| HoVer-tuned | one by one | 0.556 | 0.592 | 0.507 | 0.568 | 0.566 |
+| HoVer-tuned | together | **0.857** | **0.865** | **0.862** | **0.843** | **0.744** |
 
 ![Figure 1 – HoVer. Left: accuracy with the gold articles by number of hops (dashed: one by one, solid: together; HoVer-tuned: seed 13). Right: share of claims for which all the needed articles are in the top 10.](../results/figures/multihop.png){width=78%}
 
 **Reading the articles together is what makes multi-hop work.** Joint reading beats
 the one-by-one reading of ClaimGuard for the zero-shot model (+0.11, McNemar b = 144,
-c = 78, p < 0.001) and for the HoVer-tuned reader (+0.30, p < 0.001 for each seed); for
-our SciFact verifier the gain is smaller (+0.06, p = 0.03). Joint reading also shortens
-each article (330 words shared between them), so we read the articles one by one with
-the same cut: this gives 0.620 / 0.635 / 0.555 for the three readers, almost the same
-as uncut one-by-one reading, and joint reading still wins (p < 0.001 for the zero-shot
-and HoVer readers, p = 0.11 for the SciFact one). The gain comes from reading together,
-not from shorter inputs. Read one by one, accuracy falls from about 0.70 at 2 hops to
-0.58 at 3 and 4 hops: when no single article proves the claim, combining per-article
-scores cannot recover the link. The HoVer-tuned joint reader stays at 0.84–0.87 for
-every number of hops, while the two other readers lose 0.10–0.15: concatenating is not
-enough, the reader has to learn to combine. Read one by one, the HoVer-tuned reader is
-no better than the claim-only control (0.556 vs 0.562), having learned that one article
-is rarely enough. With 3 distractor articles in the premise it drops to 0.744 but stays
-far above one-by-one reading.
+c = 78, p < 0.001) and the HoVer-tuned reader (+0.30, p < 0.001 for each seed), and for
+our SciFact verifier by less (+0.06, p = 0.03). Joint reading also cuts each article
+(330 words shared), so we read them one by one with the same cut: 0.620 / 0.635 / 0.555,
+as without the cut, and joint reading still wins (p < 0.001; p = 0.11 for the SciFact
+verifier). One by one, accuracy falls from about 0.70 at 2 hops to 0.58 at 3 and 4: when
+no single article proves the claim, per-article scores cannot recover the link. Only the
+HoVer-tuned joint reader stays flat (0.84–0.87): it has to learn to combine. Read one by one, it is no better than the claim-only control (0.556 vs 0.562).
+With 3 distractors in the premise it drops to 0.744, still far above one-by-one reading.
 
 Table 6 – HoVer end to end, HoVer-tuned reader (seed 13, fixed before the run).
 
@@ -456,18 +426,15 @@ Table 6 – HoVer end to end, HoVer-tuned reader (seed 13, fixed before the run)
 | two rounds (iterative) | together | **0.648** [0.608, 0.687] | 0.603 |
 
 **Retrieval is the bottleneck.** In a pool of 49,903 articles, all the needed articles
-are in the top 10 for 74% of the 2-hop claims, 21% of the 3-hop claims and 3% of the
-4-hop claims. The iterative retriever finds them more often (35% against 33% overall,
-McNemar b = 24, c = 8, p = 0.007; 26% against 21% at 3 hops) but rarely reaches the
-third or fourth article. End to end (Table 6), reading together is the factor that
-matters: +0.09 to +0.11 at top 5 (p < 0.001 with one or two rounds), +0.07 to +0.08 at
-top 10 (p ≤ 0.02). The second retrieval round adds +0.016 at top 5 and nothing at top
-10 (p ≥ 0.11): its retrieval gain is real but too small to show in the verdicts.
-Top 10 is worse than top 5 for joint reading, because each article then gets only 33
-words. The best setting (0.648) is clearly above the claim-only control (0.562) and
-ClaimGuard's reading (0.538, p < 0.001), but far from the 0.857 reached with the gold
-articles. The pool is built from the dev claims only, and nothing was tuned on this
-sample (HoVer test labels are not public).
+are in the top 10 for 74% / 21% / 3% of the 2 / 3 / 4-hop claims; the iterative
+retriever finds them more often (35% vs 33%, McNemar b = 24, c = 8, p = 0.007) but rarely
+reaches the third or fourth article. End to end (Table 6), reading together is what
+matters (+0.09 to +0.11 at top 5, p < 0.001; +0.07 to +0.08 at top 10, p ≤ 0.02), while
+the second round adds +0.016 at top 5 and nothing at top 10 (p ≥ 0.11). Top 10 is worse
+for joint reading because each article gets only 33 words. The best setting (0.648) is
+well above the claim-only control (0.562) and ClaimGuard's reading (0.538, p < 0.001),
+but far from 0.857 with the gold articles. The pool comes from the dev claims only and
+nothing was tuned on this sample.
 
 ## 5. Error Analysis
 
@@ -487,15 +454,15 @@ Table 7 – Error categories (110 errors).
 
 | Category | Definition | SciFact | Climate | Total | Main confusion |
 | --- | --- | --- | --- | --- | --- |
-| Wrong sentences | right document, wrong sentences given to the verifier | 25 | 7 | 32 (29%) | SUPPORTED → NEI |
-| Related but insufficient | related evidence read as proof of an essential part it does not establish | 17 | 2 | 19 (17%) | NEI → SUPPORTED |
-| REFUTED vs NEI | evidence weighs against the claim without contradicting it, or the reverse | 11 | 4 | 15 (14%) | NEI → REFUTED |
-| Domain vocabulary | a technical term or relation is misread | 15 | 0 | 15 (14%) | NEI → SUPPORTED |
-| Evidence not retrieved | no gold document reached the verifier | 9 | 0 | 9 (8%) | REFUTED → NEI |
-| Numbers | number, unit or statistical result misread | 4 | 1 | 5 (5%) | SUPPORTED → NEI |
-| Multi-sentence evidence | proof needs two sentences together | 5 | 0 | 5 (5%) | SUPPORTED → NEI |
-| Negation / quantifier | scope of "not", "no evidence", "often" | 4 | 1 | 5 (5%) | REFUTED → SUPPORTED |
-| Gold label questionable | our reading disagrees with the gold label | 5 | 0 | 5 (5%) | NEI → SUPPORTED |
+| Wrong sentences | right abstract, wrong sentences read | 25 | 7 | 32 (29%) | SUPPORTED → NEI |
+| Related but insufficient | related passage taken as proof | 17 | 2 | 19 (17%) | NEI → SUPPORTED |
+| REFUTED vs NEI | against the claim, not contradicting it | 11 | 4 | 15 (14%) | NEI → REFUTED |
+| Domain vocabulary | technical term misread | 15 | 0 | 15 (14%) | NEI → SUPPORTED |
+| Evidence not retrieved | no gold abstract retrieved | 9 | 0 | 9 (8%) | REFUTED → NEI |
+| Numbers | number or statistic misread | 4 | 1 | 5 (5%) | SUPPORTED → NEI |
+| Multi-sentence evidence | needs two sentences together | 5 | 0 | 5 (5%) | SUPPORTED → NEI |
+| Negation / quantifier | scope of "not", "no", "often" | 4 | 1 | 5 (5%) | REFUTED → SUPPORTED |
+| Gold label questionable | gold label debatable | 5 | 0 | 5 (5%) | NEI → SUPPORTED |
 
 
 
@@ -507,10 +474,10 @@ Figure A5 in the appendix shows the same counts. Three numbers stand out.
 * **The most frequent confusion is NEI → SUPPORTED** (39 of 110). On SciFact, NEI
   claims have the highest error rate (48 of 112, 43%), against 34% for REFUTED
   (22 of 64) and 20% for SUPPORTED (25 of 124).
-* **Numbers and negations are not where SciFact errors are.** Claims with a number
-  have an error rate of 29% (33 of 114) against 33% for the others (62 of 186); claims
-  with a negation 24% (7 of 29) against 33%. This looks like it contradicts the
-  contrast set, but it does not: the number flag groups project names ("1,000 Genomes project") with genuine prevalence claims ("1/2000 in the UK"). The contrast set isolates a different question: does the verdict change when only the value changes?
+* **Numbers and negations are not where SciFact errors are**: claims with a number fail
+  29% of the time (33 of 114) against 33% for the others, claims with a negation 24%.
+  This does not contradict the contrast set, which asks another question: does the
+  verdict change when only the value changes?
 
 ### 5.2 Qualitative analysis
 
@@ -533,17 +500,11 @@ part in translation initiation, which does not show that it discriminates betwee
 two tRNAs. The model checks that the claim's entities and relation appear in the
 passage, not that the specific link the claim asserts is established.
 
-**REFUTED vs NEI.** Claim 213, *"CRP is not predictive of postoperative mortality
-following CABG surgery"* (gold NEI, predicted REFUTED, 0.92). The abstract links CRP
-to long-term mortality after bypass surgery; the claim leaves the postoperative time horizon unspecified. An association over long-term follow-up does not by itself settle the prediction question as worded.
-
 **Domain vocabulary.** The pair of claims 268 and 269 is telling: *"Cold exposure
 increases BAT recruitment"* is predicted SUPPORTED (0.82) and *"Cold exposure reduces
-BAT recruitment"* is predicted REFUTED (0.82), while both are NEI (the second one is
-counted under REFUTED vs NEI). The abstract says
-that cold makes brown adipose tissue express Ucp1, a thermogenic response, but never
-measures recruitment of the tissue. The model treats "express Ucp1" and "recruit BAT"
-as interchangeable, although the passage measures only the former.
+BAT recruitment"* is predicted REFUTED (0.82), while both are NEI. The abstract shows that cold
+makes brown adipose tissue express Ucp1 but never measures its recruitment: the model
+treats the two as interchangeable.
 
 **Negation scope.** Claim 1290, *"There is an inverse relationship between hip
 fractures and statin use"* (gold SUPPORTED, predicted REFUTED, 0.91). The abstract
@@ -558,19 +519,16 @@ evidence" to statins instead of to the other drugs.
    pattern. *Fix:* add hard negatives built from the gold abstract itself (sentences of
    the right abstract that do not support the claim, labelled NEI) so that the model
    learns that the right topic is not enough.
-2. **Wrong sentence selection is the most frequent annotated category** (32 errors), while reranking documents left the end-to-end score unchanged in this experiment. *Fix:* select sentences with the verifier's own scores, or give the
-   verifier the whole abstract when it fits in 512 tokens.
-3. **Confidence does not separate these errors.** 40% of them are made with at least
-   0.8 confidence, so abstention protects against hesitant errors only. *Fix:* report
-   the decisive passage to the user, as the demo does, so a human can check it in a
-   few seconds.
-4. **Numbers are a hidden risk.** They are rare in SciFact errors but the contrast
-   set shows that the model misses 70% of changed numbers, which matters most for the
-   use cases we target (banking, prices, dates). *Fix:* a rule that compares the
-   numbers of the claim and of the decisive sentence before the verifier, as in our
-   lexical baseline, which flags 100% of number edits (it also rejects many true
-   claims, so it should only send a warning, not decide alone).
-5. **Some labels are debatable** (5 of 110). On a test set of 300 claims, a few disputed decisions warrant a closer look when comparing nearby scores in Table 2.
+2. **Wrong sentence selection is the most frequent annotated category** (32 errors),
+   and the gold-sentence experiment (A6) confirms it is where the gap is. *Fix:* select
+   sentences with the verifier's own scores, or read the whole abstract when it fits.
+3. **Confidence does not separate these errors** (40% at confidence ≥ 0.8), so
+   abstention catches hesitant errors only. *Fix:* show the decisive passage, as the demo does.
+4. **Numbers are a hidden risk.** Rare in SciFact errors, but the model misses 70% of
+   changed numbers in the contrast set, and amounts matter most in banking. *Fix:* a
+   number check before the verifier, as in our rule baseline (it flags every number
+   edit but rejects many true claims, so it should warn, not decide).
+5. **Some labels are debatable** (5 of 110), which matters when comparing close scores.
 
 ## 6. Discussion
 
@@ -585,28 +543,23 @@ evidence" to statins instead of to the other drugs.
 **Ethical considerations.** When ClaimGuard says SUPPORTED, it means the documents we gave it back up the claim. If a product sheet lists the wrong rate, a claim that repeats that rate can still get a SUPPORTED verdict. It's easy to read that label as proof that the rate is correct, especially when the score is high. In our review, 44 of the 110 wrong answers had a confidence score of at least 0.8. Someone should always read the original passage before making a decision based on the result.
 SciFact uses English biomedical texts, and we wrote the 60 claims in our French banking set ourselves. We'd need more testing before we could expect similar results in other languages or fields. ClaimGuard runs locally without calling any external APIs, but the audit log still saves the claims people enter. A company using it should decide how long to keep those claims and delete them when that time is up.
 
-**Limitations.** (1) Faithfulness, not truth: a claim that repeats a wrong document
-is SUPPORTED. (2) The test set has 300 claims, so intervals are wide and small
-differences are hard to interpret. (3) SciFact annotations are incomplete, so some hard
-negatives used in training and some "false" positives at test time may be real
-evidence. (4) English training data only; the French set is small and synthetic. (5) Sentences are checked one by one without resolving pronouns. The joint reader
-is a separate module (`claimguard.multihop`) tested on HoVer; the demo and the MCP
-server still read passages one by one, which is right for SciFact-like single-document
-claims but not for multi-hop ones. Multi-hop retrieval is weak: all the articles of a
-4-hop claim are found for 4% of the claims (Section 4.9). (6) The contrast set labels come from rules. (7) The error categories were assigned by a single annotator, the author, and both passes took place on the same day. Their agreement shows that the author applies them consistently, not that someone else would. (8) Long documents with tables are out of scope. (9) Our dev split is random by claim, not by document, and it is easier than the test set (macro-F1 about 0.83 on dev against 0.68 on test), so the values tuned on dev, the threshold above all, are optimistic.
+**Limitations.** (1) Faithfulness, not truth. (2) 300 test claims: wide intervals. (3)
+SciFact annotations are incomplete, so some hard negatives and some "false" positives
+may be real evidence. (4) English training data; the French set is small and ours. (5)
+Sentences are checked without resolving pronouns, and the joint reader is a separate
+module (`claimguard.multihop`): the demo and the MCP server read passages one by one,
+which suits single-document claims only; multi-hop retrieval finds all articles of a
+4-hop claim for 4% of claims. (6) Contrast-set labels come from rules. (7) One
+annotator, two passes on the same day: the agreement shows consistency, not that
+someone else would agree. (8) No tables or long documents. (9) The dev split (random by
+claim) is easier than test (macro-F1 0.83 vs 0.68), so dev-tuned values, the threshold
+above all, are optimistic.
 
 ## 7. Conclusion and Future Work
 
-Three things stuck with us from building ClaimGuard. A small model trained on a similar task came close to the 7B judge on SciFact and ran about 25 times faster on the same GPU. Changing a single number showed us a weakness we'd have missed if we'd only looked at the overall score. And the feature we'd most want as users is being able to click on a verdict and read the sentence behind it, especially when the model sounds sure of itself.
+Three things stuck with us from building ClaimGuard. A small model trained on a similar task came close to the 7B judge on SciFact and was about four times faster end to end on the same GPU, and thirty times faster for the verification step alone. Changing a single number showed us a weakness we'd have missed if we'd only looked at the overall score. And the feature we'd most want as users is being able to click on a verdict and read the sentence behind it, especially when the model sounds sure of itself.
 
 We'd start by checking confidence separately for different kinds of claims. An analyst might handle a flagged interest rate differently from a flagged product description. With more labelled examples, we'd also test whether a model can learn to combine passages better than noisy-OR. A small LLM could help split longer answers into claims, and multi-hop dense retrieval (Xiong et al., 2021) could find the missing bridge articles. We'd compare ClaimGuard with MiniCheck on the full LLM-AggreFact benchmark. For the demo, we'd add the option to run the verifier automatically after each assistant answer.
-
-**Use of AI tools.** Claude Code (Anthropic) was used as a coding assistant for parts
-of the code and the Kaggle notebooks, for first drafts of some report sections, which
-I then rewrote, and to review the project before submission. The project design, the
-choice of experiments, the reading of the results and the annotation of the 110 errors
-are my own work. No AI model produced any label used in the evaluation; the only
-language models in the results are the systems being evaluated.
 
 ## References
 
@@ -637,6 +590,15 @@ language models in the results are the systems being evaluated.
 25. Yang, Z., Qi, P., Zhang, S., Bengio, Y., Cohen, W., Salakhutdinov, R., Manning, C. (2018). HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering. EMNLP.
 
 <!-- Before submitting: open each reference on Google Scholar and check authors, year and venue. -->
+
+## AI use statement
+
+Claude Code (Anthropic) was used as a coding assistant for parts
+of the code and the Kaggle notebooks, for first drafts of some report sections, which
+I then rewrote, and to review the project before submission. The project design, the
+choice of experiments, the reading of the results and the annotation of the 110 errors
+are my own work. No AI model produced any label used in the evaluation; the only
+language models in the results are the systems being evaluated.
 
 ## Appendix
 

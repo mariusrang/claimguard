@@ -205,11 +205,12 @@ Dense + reranker vs BM25: +0.076 recall@5, paired permutation test p = 0.0007.
 | Rule-based verifier (numbers, negation, overlap) | 0.475 [0.422, 0.533] | - |
 | BM25 + zero-shot DeBERTa NLI | 0.570 [0.515, 0.625] | 0.05 s (T4) |
 | Full retrieval + zero-shot DeBERTa NLI | 0.609 [0.550, 0.667] | 0.37 s (T4) |
-| Full retrieval + LLM judge (Qwen2.5-7B-Instruct, 4-bit) | 0.671 [0.612, 0.722] | LLMTIME |
-| **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.012** | 0.40 s (T4), 5.9 s (CPU) |
+| Full retrieval + LLM judge (Qwen2.5-7B-Instruct, 4-bit) | 0.671 [0.612, 0.722] | 1.72 s (T4) |
+| **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.012** | 0.42 s (T4), 5.9 s (CPU) |
 
 Time = median per claim, whole pipeline, each system with its own number of passages
-chosen on dev (`results/latency_cpu.json`, notebooks 07-08).
+chosen on dev (`results/latency_cuda.json`, `results/latency_cpu.json`, notebooks 07-08).
+The LLM judge picks k = 1 on dev; an earlier "26x faster" compared it reading 10 passages.
 
 The main system used everywhere else (seed 13, with the temperature T = 2.42 chosen on
 dev) gets 0.676 macro-F1; the same seed without temperature gets 0.685. The gap comes
@@ -224,7 +225,9 @@ answers are evaluated separately (coverage and selective accuracy, below).
    McNemar p = 1.0, so no difference either way. It is clearly better than zero-shot
    NLI (+0.067 [+0.009, +0.124], p = 0.04; p ≤ 0.02 for each seed), BM25 + zero-shot
    (+0.106, p = 0.001) and the rules (+0.200, p < 0.0001); all in
-   `results/paired_tests.json` (`scripts/paired_tests.py`). LLMSPEEDREADME
+   `results/paired_tests.json` (`scripts/paired_tests.py`). Each at its own k, ClaimGuard
+   takes 0.42 s per claim on a T4 and the judge 1.72 s, 4x slower end to end (30x for
+   the verification step alone: 1.36 s vs 0.04 s), and ClaimGuard runs without a GPU or an API.
 2. *Aggregation matters more than retrieval tricks.* The "majority" baseline, which
    averages the probabilities of the passages, collapses to 0.369 macro-F1: several
    neutral passages outweigh the one passage that supports or refutes. Noisy-OR and
@@ -303,7 +306,7 @@ Code: `src/claimguard/multihop.py`, `scripts/run_multihop.py`; results in
 The joint reader is a separate module: the demo and the MCP server still read passages
 one by one, which fits SciFact-like claims but not multi-hop ones.
 
-**Efficiency.** On a T4 the whole pipeline takes 0.40 s per claim, 0.35 s of which is the
+**Efficiency.** On a T4 the whole pipeline takes 0.42 s per claim, 0.37 s of which is the
 cross-encoder reranking; on CPU only (2 threads) 5.9 s, 5.1 s of which is reranking. The
 reranker does not change the verdicts (see 2. above), so it is the first thing to drop
 for a CPU deployment (not measured). The verifier has 184M parameters, 738 MB in FP32. Dynamic INT8 quantization shrinks it

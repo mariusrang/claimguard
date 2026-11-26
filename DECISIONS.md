@@ -223,7 +223,8 @@ to be able to explain without notes.
   - the "25x faster than the LLM judge" compared the judge on 10 passages with
     ClaimGuard on 3, whereas the judge picks k = 1 on dev. Session 5 times every system
     with its own k; the judge is timed in session 5b (bitsandbytes was missing on the
-    Kaggle image in session 5);
+    Kaggle image in session 5). Result: 1.72 s per claim for the judge vs
+    0.42 s for ClaimGuard, 4x end to end and 30x for the verification step alone;
   - "1.0 s per claim on CPU" was the verifier alone. The full pipeline on CPU takes
     5.9 s per claim, mostly the cross-encoder reranking;
   - the multi-hop pool contained the gold articles of the training claims. It is now

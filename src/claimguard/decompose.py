@@ -34,7 +34,9 @@ _LEAD_IN = re.compile(
 _NOT_A_STATEMENT = re.compile(
     r"^(?:thanks|thank you|hope (?:this|that) helps|feel free|let me know|happy to help|here it is|"
     r"here you go|here (?:is|are) (?:the |a |some )?(?:answer|summary|details|information)[.!:]*$|"
-    r"great|perfect|good luck|you're welcome)\b",
+    r"great|perfect|good luck|you're welcome)\b"
+    # a bare acknowledgement on its own: "Sure!", "Of course.", "OK"
+    r"|^(?:sure|of course|certainly|absolutely|okay|ok|yes|no problem)[\s.!,]*$",
     re.IGNORECASE,
 )
 

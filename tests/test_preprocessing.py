@@ -129,5 +129,7 @@ def test_no_sentence_disappears_silently():
                           "Application fees are 900 euros."]
     statuses = {s.original: s.status for s in segs}
     assert statuses["Is that clear?"] == "ignored" and statuses["Hope this helps!"] == "ignored"
+    bare = {s.original: s.status for s in analyse_answer("Sure! Of course. The rate is 3.45%.")}
+    assert bare["Sure!"] == "ignored" and bare["Of course."] == "ignored"  # bare filler, not a claim
     assert statuses["Fees: none."] in ("claim", "too_short")  # never dropped: checked or NOT_CHECKED
     assert len(segs) == 6  # every sentence has a status

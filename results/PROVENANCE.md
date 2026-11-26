@@ -32,3 +32,7 @@ Two Kaggle runs (GPU T4), 23-24 Nov 2026.
     same code and data) with the same numbers.
 - `paired_tests.json`: computed locally (CPU) from the saved predictions of run 2 and run 1
   (`scripts/paired_tests.py`), each system with its own k, aggregation and temperature chosen on dev.
+- Session 5b (26 Nov, notebook `notebooks/08_kaggle_llm_latency.ipynb`, T4): `latency_cuda.json`.
+  The main system and the Qwen-7B judge were timed in the same session (bitsandbytes installed),
+  each at its own k chosen on dev. The zero-shot and BM25 + zero-shot timings in the same file
+  come from the session-5 log (the file itself was not written there, see above).

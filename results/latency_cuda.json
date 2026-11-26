@@ -1,0 +1,50 @@
+{
+  "device": "cuda",
+  "torch_threads": 2,
+  "n_claims": 20,
+  "note": "Kaggle session 5b (notebook 08), T4; main and llm_judge timed in the same session, each at its own k chosen on dev. zeroshot and bm25_zeroshot come from the session-5 log (same code, same T4 type).",
+  "systems": {
+    "main": {
+      "k": 3,
+      "p50_ms": 423.02519200001143,
+      "p95_ms": 468.0956354499872,
+      "stages_p50_ms": {
+        "retrieval": 9.84,
+        "rerank": 371.52,
+        "verification": 44.195
+      }
+    },
+    "llm_judge": {
+      "k": 1,
+      "p50_ms": 1716.1914455000158,
+      "p95_ms": 2135.3628026500273,
+      "stages_p50_ms": {
+        "retrieval": 10.95,
+        "rerank": 351.75,
+        "verification": 1362.0100000000002
+      }
+    },
+    "zeroshot": {
+      "k": 1,
+      "p50_ms": 366.2157574999867,
+      "p95_ms": 381.1424515000141,
+      "stages_p50_ms": {
+        "retrieval": 10.535,
+        "rerank": 328.67,
+        "verification": 26.565
+      },
+      "session": 5
+    },
+    "bm25_zeroshot": {
+      "k": 3,
+      "p50_ms": 46.394462000023395,
+      "p95_ms": 59.381310049988656,
+      "stages_p50_ms": {
+        "retrieval": 0.31,
+        "rerank": 0.42,
+        "verification": 45.405
+      },
+      "session": 5
+    }
+  }
+}
