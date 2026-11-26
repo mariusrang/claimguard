@@ -1,5 +1,9 @@
 # ClaimGuard — project plan (v2, after the expert review)
 
+> This is the plan I wrote on 21 November, kept as it was so that the gap between plan
+> and result stays visible. Section 8 says what actually happened; where they differ,
+> section 8, the README and the report are right.
+
 NLP final project, topic 2: **Fact Verification with Evidence Retrieval**.
 
 **Deadline: 15 December 2026.** Compute: Google Colab only (no school GPU), so the
@@ -133,25 +137,18 @@ confusion · domain vocabulary · questionable gold label.
 | Technical report, 5–10 pages | `report/report_draft.md` → `report.pdf` |
 | 10–15 minute video | to record at the end |
 
-## 8. Status
+## 8. What actually happened (updated 26 November)
 
-| Step | Status |
+| Planned | What was done |
 | --- | --- |
-| Code: pipeline, stress tests, LLM-AggreFact evaluation, demo, MCP server | done, 63 tests pass offline |
-| French bank set, toy sample, contrast-set builder | done (French set still to re-read by hand) |
-| Experiments on SciFact, Climate-FEVER, LLM-AggreFact | to run on Colab |
-| Error annotation, report results, video | after the runs |
+| Colab only | Kaggle T4 instead (longer sessions, unattended runs): 5 sessions, see `results/PROVENANCE.md` |
+| Sweep with batch size {16, 32} | batch 32 ran out of GPU memory in float32; 6 runs at batch 16 |
+| INT8 quantization in the deployed model | measured and dropped: accuracy falls from 0.856 to 0.407 for about 10% speed |
+| Hand-check of 50 contrast examples | not done; the contrast-set labels stay rule-based (limitation in the report) |
+| Second annotation pass one week later | done the same day, a few hours later; the report says this probably inflates κ |
+| Oracle on all claims | redone on the 188 claims with evidence, in two steps (gold abstracts, gold sentences) |
+| (not planned) | multi-hop extension on HoVer: joint reader and iterative retrieval, asked for by the topic |
+| (not planned) | paired tests against every baseline (`results/paired_tests.json`) |
 
-## 9. Schedule to 15 December
-
-| Week | Dates | Goal | Done when |
-| --- | --- | --- | --- |
-| 1 | 21–27 Nov | Colab sessions 1 and 2 (data, retrieval, baselines, sweep, 3 seeds). Re-read the 60 French items. Read `src/` and `DECISIONS.md`. | `results/` has retrieval, baselines, sweep and 3 checkpoints on Drive |
-| 2 | 28 Nov–4 Dec | Colab session 3 (pipeline + ablations, calibration, LLM judge, stress tests, LLM-AggreFact). Export errors, **first annotation pass (100+)**. Hand-check 50 contrast examples. | `make tables` gives every table; `errors_annotated.csv` has 100+ rows |
-| 3 | 5–11 Dec | Write the result sections and the error analysis from `results/tables.md`. **Second annotation pass on 25 errors** (one week after the first) for Cohen's kappa. Build the Docker image once on my laptop. Check the 18 references. | `report.pdf` complete, 5–10 pages |
-| 4 | 12–14 Dec | Record the 10–15 min video, last README pass, final zip / repo. | everything sent |
-| — | 15 Dec | Deadline. Video to benjamin.dallard@centralesupelec.fr. | |
-
-Rule: if week 2 slips, drop the contrast-set hand check and Climate-FEVER first.
-The main pipeline, the LLM-AggreFact extension, calibration and the error analysis
-are the parts the professor asked for and the grid rewards most.
+Code: 76 tests pass offline. Remaining: ethics section, final rewrite of the report in
+my own words, video (10-15 min).

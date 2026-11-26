@@ -1,0 +1,55 @@
+{
+  "setting": {
+    "k": 3,
+    "aggregation": "noisy_or",
+    "temperature": 2.4190300082343583
+  },
+  "n_claims": 300,
+  "n_with_evidence": 188,
+  "variants": {
+    "retrieved": {
+      "accuracy_with_evidence": {
+        "value": 0.75,
+        "low": 0.680718085106383,
+        "high": 0.8085106382978723
+      },
+      "macro_f1_all_claims": 0.675532396099079,
+      "errors_with_evidence": 47,
+      "errors_without_evidence": 48
+    },
+    "gold_doc_system_sentences": {
+      "accuracy_with_evidence": {
+        "value": 0.7393617021276596,
+        "low": 0.675531914893617,
+        "high": 0.7978723404255319
+      },
+      "macro_f1_all_claims": 0.6748854397971454,
+      "errors_with_evidence": 49,
+      "errors_without_evidence": 48,
+      "mcnemar_vs_retrieved_with_evidence": {
+        "b": 6,
+        "c": 8,
+        "p_value": 0.79052734375
+      },
+      "errors_fixed": 6,
+      "errors_created": 8
+    },
+    "gold_sentences": {
+      "accuracy_with_evidence": {
+        "value": 0.851063829787234,
+        "low": 0.8031914893617021,
+        "high": 0.898936170212766
+      },
+      "macro_f1_all_claims": 0.7431697087837438,
+      "errors_with_evidence": 28,
+      "errors_without_evidence": 48,
+      "mcnemar_vs_retrieved_with_evidence": {
+        "b": 24,
+        "c": 5,
+        "p_value": 0.0005461126565933228
+      },
+      "errors_fixed": 24,
+      "errors_created": 5
+    }
+  }
+}

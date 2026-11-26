@@ -44,7 +44,8 @@ def main() -> None:
         md, page = Path(tmp) / "report.md", Path(tmp) / "report.html"
         md.write_text(text, encoding="utf-8")
         subprocess.run(
-            ["pandoc", str(md), "-o", str(page), "--standalone", "--embed-resources",
+            # no fancy lists: a wrapped line starting with "64)" or "(4)" must stay text
+            ["pandoc", str(md), "-f", "markdown-fancy_lists", "-o", str(page), "--standalone", "--embed-resources",
              f"--resource-path={ROOT / 'report'}"],
             check=True,
         )

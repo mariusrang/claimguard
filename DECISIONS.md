@@ -16,9 +16,11 @@ to be able to explain without notes.
 
 ## Data
 
-- **Official dev = my test.** SciFact test labels are not public. So I never touch the
-  official dev set for any decision; model selection, temperature and threshold are
-  all chosen on my own dev split (15% of train, stratified, seed 13).
+- **Official dev = my test.** SciFact test labels are not public. So the official dev
+  set is my test set; model selection, temperature and threshold are all chosen on my
+  own dev split (15% of train, stratified, seed 13). One exception, told in
+  "Calibration" below: a look at the test ECE of the rule-based baseline made me change
+  how T is fitted. Nothing else was decided from test numbers.
 - **Claim label.** SUPPORTED / REFUTED if the claim has gold evidence with that label,
   NEI if it has no evidence. This is the 3-way claim-level task; the official SciFact
   metric is at abstract level, so my numbers are not directly comparable to the
@@ -82,7 +84,10 @@ to be able to explain without notes.
 ## Calibration and abstention
 
 - **Temperature scaling.** One parameter, fitted on dev by minimising the NLL (1-D
-  bounded search on log T). It cannot change the predicted label, only the confidence.
+  bounded search on log T). On one passage it cannot change the predicted label, only
+  the confidence. After noisy-OR over several passages it can: T changes how strongly
+  each passage counts, which is why seed 13 gets 0.685 macro-F1 with T = 1 and 0.676
+  with T = 2.42.
 - **Temperature is fitted on the claim-level probabilities.** My first version fitted T
   on the passage pairs. On the real SciFact data (lexical baseline) that made the
   claim-level ECE worse on test (0.206 -> 0.258), because the aggregation changes the
@@ -107,14 +112,19 @@ to be able to explain without notes.
   With 300 test claims a 2-point difference is often noise, and I prefer to show it.
 - **No multiple-comparison correction.** I report the raw p-values and say that there
   are several comparisons, instead of adding Holm-Bonferroni on a handful of tests.
-- **Oracle experiment.** Gold evidence instead of retrieved evidence. The share of
-  errors that disappears is the share caused by retrieval.
+- **Oracle experiment, on the claims with evidence only.** My first version counted all
+  300 claims, but the 112 NEI claims have no gold evidence, so their 48 errors could not
+  change by construction. Session 5 compares on the 188 claims with evidence, in two
+  steps: gold abstracts with my own sentence selection (tests retrieval), then gold
+  sentences (tests sentence selection). Result: retrieval is not the problem (0.739 vs
+  0.750), sentence selection is (0.851).
 
 ## Stress tests
 
 - **Contrast set by rules.** One edit per example: a number, a negation or an antonym.
   Labels are noisy (an edited claim can still be true by accident), so the metric is
-  the rate of predictions that stop being SUPPORTED, and I check a sample by hand.
+  the rate of predictions that stop being SUPPORTED. I did not check the edited claims
+  by hand, so the contrast-set labels stay rule-based (a limitation in the report).
 - **Consistency.** Right on the original pair AND reacts to the edit. A model that
   always says REFUTED would have a perfect flip rate; consistency catches that.
 
@@ -149,8 +159,16 @@ to be able to explain without notes.
 - **Dynamic INT8 quantization (PyTorch) instead of ONNX.** Fewer moving parts, and I
   can test it in CI on a tiny model. I measure size, latency and accuracy before and
   after instead of assuming it is free.
-- **Audit log as JSONL.** Append-only, one verdict per line with the model version
-  (verifier name, aggregation, temperature, threshold). Easy to export and to diff.
+- **Audit log as JSONL.** Append-only, one verdict per line with the exact setup of
+  that verdict (verifier name and a fingerprint of its weights, aggregation,
+  temperature, the threshold and k used for this request). Easy to export and to diff.
+- **Settings per request, not per server.** The first demo changed the shared
+  pipeline's threshold when a visitor moved the slider, so two visitors could change
+  each other's results and the log recorded the wrong values. Threshold and k are now
+  arguments of each call.
+- **No sentence is dropped silently.** When checking an answer, a sentence too short to
+  check is returned as NOT_CHECKED, and questions or filler are listed as "not a
+  statement". Users must see what was not checked.
 - **MCP: four tools, short outputs.** The assistant gets the decision, the confidence
   and the best evidence; the full record stays in the audit log.
 - **Sources mode chunks documents (6 sentences) and uses BM25 on the fly.** Simple and
@@ -158,7 +176,7 @@ to be able to explain without notes.
 
 ## Things I should be able to answer in the video
 
-1. Why can temperature scaling not change accuracy?
+1. Why can temperature scaling change accuracy here, when it never changes the label of a single passage?
 2. Why does RRF not need score normalisation?
 3. What does the claim-only baseline tell about the dataset?
 4. Why are hard negatives needed, and what is their risk on SciFact?
@@ -186,14 +204,32 @@ to be able to explain without notes.
     The crash happened before the config was updated, so the 3 seeds used the default.
     I keep it that way and say it: re-training for a 0.003 gain is not worth GPU time.
   - dynamic INT8 on every Linear layer broke the verifier (accuracy with gold evidence
-    0.856 -> 0.407) for a small speed gain (1.02 s -> 0.88 s per claim on CPU). DeBERTa's
+    0.856 -> 0.407) for a small speed gain (1.02 s -> 0.88 s per call of 5 passages on CPU,
+    verifier only). DeBERTa's
     attention projections are too sensitive. Session 3 tests quantizing only the
     feed-forward layers. A negative result that is measured is still a result.
 - **Results of the two runs are merged** in `results/` (see `results/PROVENANCE.md`): run 1
   for everything that does not use the fine-tuned model, run 2 for the rest.
 - **24 Nov, run 3: INT8 dropped for this model.** Quantizing only the feed-forward layers
   did not save the verifier either (accuracy with gold evidence 0.856 FP32, 0.407 all layers,
-  0.455 feed-forward only) and the CPU speed-up is about 10% (1.04 s -> 0.92-0.95 s per claim).
+  0.455 feed-forward only) and the CPU speed-up is about 10% (1.04 s -> 0.92-0.95 s per call of
+  5 passages, verifier only).
   Dynamic INT8 is not a free lunch for DeBERTa-v3; the demo and the MCP server keep FP32.
   Static quantization with calibration data, ONNX Runtime or a distilled smaller verifier are
   listed as future work.
+- **26 Nov, review of the first draft, session 5.** An outside review (playing the
+  teacher) found mistakes in my analysis, which I fixed rather than hid:
+  - the oracle counted the NEI claims (see "Oracle experiment" above);
+  - the "25x faster than the LLM judge" compared the judge on 10 passages with
+    ClaimGuard on 3, whereas the judge picks k = 1 on dev. Session 5 times every system
+    with its own k; the judge is timed in session 5b (bitsandbytes was missing on the
+    Kaggle image in session 5);
+  - "1.0 s per claim on CPU" was the verifier alone. The full pipeline on CPU takes
+    5.9 s per claim, mostly the cross-encoder reranking;
+  - the multi-hop pool contained the gold articles of the training claims. It is now
+    built from the dev claims only (49,903 articles); the numbers barely moved;
+  - joint reading also shortens each article, so I added a control that reads the
+    articles one by one with the same cut: the gain of joint reading stays;
+  - the HoVer reader was trained once: now 3 seeds (0.857 ± 0.003), and its validation
+    macro-F1 is computed on the two classes HoVer has (it was capped at 2/3 before);
+  - the abstract compared two different readers in one sentence ("0.62 to 0.86").

@@ -1,0 +1,33 @@
+{
+  "base_model": "models/verifier",
+  "seed": 42,
+  "lr": 2e-05,
+  "epochs": 2,
+  "batch_size": 8,
+  "n_train_pairs": 3780,
+  "best_dev_macro_f1": 0.847449547115843,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.5964511983766758,
+      "accuracy": 0.8452380952380952,
+      "macro_f1": 0.8447725889998919,
+      "classes": [
+        0,
+        2
+      ],
+      "n": 420
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.3090712940310517,
+      "accuracy": 0.8476190476190476,
+      "macro_f1": 0.847449547115843,
+      "classes": [
+        0,
+        2
+      ],
+      "n": 420
+    }
+  ]
+}

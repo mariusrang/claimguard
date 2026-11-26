@@ -108,13 +108,20 @@ def cmd_latency(args) -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     _, claims = load_scifact(load_config(args.config)["data"]["dir"], "test")
     systems = SYSTEMS if device == "cuda" else {"": {}}  # on CPU only the main system
+    if args.only:
+        systems = {t: o for t, o in systems.items() if (t or "main") in args.only}
     out = {"device": device, "torch_threads": torch.get_num_threads(), "n_claims": args.n, "systems": {}}
     for tag, overrides in systems.items():
         ns = argparse.Namespace(**{"verifier_kind": None, "verifier_model": None, "retrieval_kind": None,
                                    "rerank_kind": None, "load_in_4bit": False, **overrides})
         cfg = ev.apply_overrides(load_config(args.config), ns)
         meta = json.loads((Path(args.out) / f"pipeline{'_' + tag if tag else ''}.json").read_text())
-        pipeline = build_pipeline(cfg)
+        try:
+            pipeline = build_pipeline(cfg)
+        except Exception as err:  # e.g. bitsandbytes missing for the 4-bit LLM: keep the other systems
+            out["systems"][tag or "main"] = {"error": f"{type(err).__name__}: {err}"}
+            print(tag or "main", "SKIPPED:", type(err).__name__, err)
+            continue
         pipeline.top_k = meta["chosen_on_dev"]["top_k"]
         for c in claims[:3]:  # warm-up: first calls build caches and CUDA kernels
             pipeline.verify_claim(c.text)
@@ -130,6 +137,7 @@ def cmd_latency(args) -> None:
             "stages_p50_ms": {s: float(np.percentile(v, 50)) for s, v in stages.items()},
         }
         print(tag or "main", out["systems"][tag or "main"])
+        save_json(Path(args.out) / f"latency_{device}.json", out)  # saved after each system
         del pipeline
         if device == "cuda":
             torch.cuda.empty_cache()
@@ -142,6 +150,7 @@ def main() -> None:
     ap.add_argument("--config", default="configs/default.yaml")
     ap.add_argument("--out", default="results")
     ap.add_argument("--n", type=int, default=20, help="timed claims per system (latency)")
+    ap.add_argument("--only", nargs="+", help="latency: only these systems (main, zeroshot, bm25_zeroshot, llm_judge)")
     args = ap.parse_args()
     for name in ("verifier_kind", "verifier_model", "retrieval_kind", "rerank_kind"):
         setattr(args, name, None)

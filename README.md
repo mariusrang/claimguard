@@ -1,9 +1,9 @@
 # ClaimGuard
 
-Evidence-based claim verification with calibrated abstention.
+Evidence-based claim verification with abstention.
 NLP final project — topic 2, *Fact Verification with Evidence Retrieval*.
 
-![tests](https://img.shields.io/badge/tests-74%20passing-brightgreen) ![coverage](https://img.shields.io/badge/coverage-90%25-green) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![tests](https://img.shields.io/badge/tests-76%20passing-brightgreen) ![coverage](https://img.shields.io/badge/coverage-91%25-green) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 ## Overview
 
@@ -16,8 +16,8 @@ information (NEI)**, with the evidence passage and a confidence score.
 The system is a pipeline of five steps that are evaluated one by one: first-stage
 retrieval (BM25, dense, or a hybrid of both with Reciprocal Rank Fusion), reranking
 with a cross-encoder, verification with a fine-tuned DeBERTa-v3 model, aggregation of
-the verdicts of several documents, and calibration of the confidence. With a
-calibrated confidence the system can abstain: under a threshold it answers
+the verdicts of several documents, and calibration of the confidence (temperature scaling). With this
+confidence the system can abstain: under a threshold it answers
 **UNCERTAIN** instead of guessing.
 
 The project goes further than the benchmark in three directions. (1) Calibration and
@@ -42,7 +42,8 @@ a CUDA GPU for training (a free Kaggle or Colab T4 is enough). Everything else a
 git clone <this repo> && cd claimguard
 python -m venv .venv && source .venv/bin/activate
 make install          # pip install -r requirements-dev.txt && pip install -e .
-make test             # 74 unit tests (plain `pytest` works too), no download needed
+make test             # 76 tests (plain `pytest` works too), no download needed
+# exact tested versions: pip install -r requirements-lock.txt
 ```
 
 Quick try without downloading any model (BM25 + rule-based verifier on a toy corpus):
@@ -202,11 +203,13 @@ Dense + reranker vs BM25: +0.076 recall@5, paired permutation test p = 0.0007.
 | Majority class | 0.195 [0.176, 0.212] | - |
 | Claim only (TF-IDF + LR, no evidence) | 0.401 [0.345, 0.457] | - |
 | Rule-based verifier (numbers, negation, overlap) | 0.475 [0.422, 0.533] | - |
-| BM25 + zero-shot DeBERTa NLI | 0.570 [0.515, 0.625] | - |
-| Full retrieval + zero-shot DeBERTa NLI | 0.609 [0.550, 0.667] | - |
-| Full retrieval + LLM judge (Qwen2.5-7B-Instruct, 4-bit) | 0.671 [0.612, 0.722] | 15.4 s (T4) |
-| **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.012** | 0.6 s (T4), 1.0 s (CPU) |
-| ClaimGuard with gold evidence (oracle) | 0.743 [0.691, 0.790] | - |
+| BM25 + zero-shot DeBERTa NLI | 0.570 [0.515, 0.625] | 0.05 s (T4) |
+| Full retrieval + zero-shot DeBERTa NLI | 0.609 [0.550, 0.667] | 0.37 s (T4) |
+| Full retrieval + LLM judge (Qwen2.5-7B-Instruct, 4-bit) | 0.671 [0.612, 0.722] | LLMTIME |
+| **ClaimGuard** (fine-tuned DeBERTa-v3-base, 3 seeds) | **0.693 ± 0.012** | 0.40 s (T4), 5.9 s (CPU) |
+
+Time = median per claim, whole pipeline, each system with its own number of passages
+chosen on dev (`results/latency_cpu.json`, notebooks 07-08).
 
 The main system used everywhere else (seed 13, with the temperature T = 2.42 chosen on
 dev) gets 0.676 macro-F1; the same seed without temperature gets 0.685. The gap comes
@@ -216,24 +219,29 @@ answers are evaluated separately (coverage and selective accuracy, below).
 
 **Key findings**
 
-1. *A fine-tuned 184M encoder does as well as a 7B LLM judge* (0.693 vs 0.671
-   macro-F1; the confidence intervals overlap and the difference was not tested). On
-   the same T4, ClaimGuard takes 0.6 s per claim versus 15.4 s for the LLM judge, about
-   26× faster. ClaimGuard also runs on CPU at 1.0 s per claim, with no API.
+1. *A fine-tuned 184M encoder is on par with a 7B LLM judge.* Paired on the same 300
+   claims, ClaimGuard (main) vs the Qwen-7B judge: +0.005 macro-F1 [−0.055, +0.064],
+   McNemar p = 1.0, so no difference either way. It is clearly better than zero-shot
+   NLI (+0.067 [+0.009, +0.124], p = 0.04; p ≤ 0.02 for each seed), BM25 + zero-shot
+   (+0.106, p = 0.001) and the rules (+0.200, p < 0.0001); all in
+   `results/paired_tests.json` (`scripts/paired_tests.py`). LLMSPEEDREADME
 2. *Aggregation matters more than retrieval tricks.* The "majority" baseline, which
    averages the probabilities of the passages, collapses to 0.369 macro-F1: several
    neutral passages outweigh the one passage that supports or refutes. Noisy-OR and
    max-confidence let one decisive passage count and get 0.676 / 0.681 (noisy-OR vs
    majority, McNemar p < 0.0001). The reranker
    improves retrieval but changes nothing end to end (p = 1.0).
-3. *Most errors are not retrieval failures.* Giving the verifier the gold evidence
-   fixes 24 of the 95 errors but creates 5 new ones, a net drop of 19 errors
-   (macro-F1 0.676 → 0.743, McNemar p = 0.0005). In the manual annotation, the right
-   document is missing for only 9 of the 95 SciFact errors. Both point the same way:
-   most errors come from the verifier and from sentence selection (see error analysis).
+3. *The errors are in sentence selection, not in document retrieval.* On the 188 test
+   claims that have evidence (NEI claims have none, so nothing can change for them),
+   accuracy is 0.750 with retrieved evidence, 0.739 with the gold abstracts and my own
+   choice of 3 sentences (p = 0.79), and 0.851 with the gold sentences (24 errors
+   fixed, 5 created, p = 0.0005; `results/oracle.json`). The manual annotation agrees:
+   the right document is missing for only 9 of the 95 SciFact errors, while wrong
+   sentence selection is the largest category (32).
 4. *Calibration.* Temperature scaling (T = 2.42) reduces the expected calibration error
-   by 46% (0.260 → 0.141). At threshold 0.8, an alert (REFUTED or NEI) is right 90.5% of the
-   time, for 70% coverage.
+   by 46% (0.260 → 0.141), but 0.141 is still far from calibrated. At the threshold
+   chosen on dev (0.5), an alert (REFUTED or NEI) is right 85.0% of the time; at 0.8,
+   90.5% for 70% coverage (0.8 is shown for illustration, it was not chosen on dev).
 
 **Stress tests** (verifier given the evidence, no retrieval)
 
@@ -252,36 +260,64 @@ fine-tuning on scientific abstracts does not transfer to summaries of news and
 dialogues.
 
 **Multi-hop claims (HoVer).** Some claims need several articles at once ("the director
-of film X was born in Y"). On 600 HoVer dev claims with the gold articles given, reading
-them **together** in one premise beats reading them one by one and combining the scores
-(as ClaimGuard does) for every reader, and a joint reader fine-tuned on HoVer training
-claims stays at 0.85 accuracy whatever the number of hops (chance = 0.5):
+of film X was born in Y"). Data: HoVer (Jiang et al., 2020), the official train and dev
+releases from the authors' GitHub, the Wikipedia text and the TF-IDF candidates from
+their server (notebook 07 downloads everything). I sample 600 dev claims, 100 per
+number of hops (2, 3, 4) and label (seed 13); HoVer test labels are not public, so
+this sample is my test set and nothing is tuned on it. With the gold articles given,
+reading them **together** in one premise beats reading them one by one and combining
+the scores (as ClaimGuard does):
 
 | Reader | One by one | Together | 2 / 3 / 4 hops (together) |
 | --- | --- | --- | --- |
 | Zero-shot NLI | 0.613 | 0.723 | 0.815 / 0.690 / 0.665 |
 | My SciFact verifier | 0.620 | 0.677 | 0.740 / 0.660 / 0.630 |
-| Joint reader trained on HoVer | 0.553 | **0.855** | 0.860 / 0.855 / 0.850 |
+| Joint reader trained on HoVer (3 seeds) | 0.556 | **0.857 ± 0.003** | 0.865 / 0.862 / 0.843 |
+| Claim only (TF-IDF + LR, no article) | 0.562 | – | – |
 
-Retrieval is the bottleneck: in a pool of 56,417 Wikipedia articles, all the needed
-articles are in the top 10 for 73% / 21% / 3% of the 2 / 3 / 4-hop claims. A second
-search round helps a little (35% against 32% overall, McNemar p = 0.008). End to end,
-the accuracy goes from 0.537 (one round, one by one) to 0.650 (two rounds, together).
+Reading one by one with each article cut to the same length as in the joint premise
+gives the same accuracy as uncut one-by-one reading, so the gain comes from reading
+together, not from shorter inputs.
+
+Retrieval is the bottleneck: in a pool of 49,903 Wikipedia articles (built from the dev
+claims only), all the needed articles are in the top 10 for 74% / 21% / 3% of the
+2 / 3 / 4-hop claims. A second search round finds them a bit more often (35% against 33%,
+McNemar p = 0.007). End to end, with the HoVer reader on the top 5 articles:
+
+| Retrieval | One by one (ClaimGuard) | Together |
+| --- | --- | --- |
+| one round | 0.538 | 0.632 |
+| two rounds | 0.537 | **0.648** |
+
+Reading together is what matters (p < 0.001); the second round adds +0.016 (p = 0.11).
+At top 10 everything is lower (0.52-0.60), because each article gets fewer words.
+
+```bash
+python scripts/run_multihop.py --hover-dir data/raw/hover --wiki data/raw/hover/wiki_wo_links.db \
+    --verifier models/verifier --train-joint --reader-seeds 13 42 2026 --out results
+python scripts/hover_claim_only.py --hover-dir data/raw/hover
+```
+
 Code: `src/claimguard/multihop.py`, `scripts/run_multihop.py`; results in
-`results/multihop.json` and `results/figures/multihop.png`.
+`results/multihop.json`, `results/hover_claim_only.json` and `results/figures/multihop.png`.
+The joint reader is a separate module: the demo and the MCP server still read passages
+one by one, which fits SciFact-like claims but not multi-hop ones.
 
-**Efficiency.** 184M parameters, 738 MB in FP32. Dynamic INT8 quantization shrinks it
+**Efficiency.** On a T4 the whole pipeline takes 0.40 s per claim, 0.35 s of which is the
+cross-encoder reranking; on CPU only (2 threads) 5.9 s, 5.1 s of which is reranking. The
+reranker does not change the verdicts (see 2. above), so it is the first thing to drop
+for a CPU deployment (not measured). The verifier has 184M parameters, 738 MB in FP32. Dynamic INT8 quantization shrinks it
 to 481 MB but accuracy falls from 0.856 to 0.407 (0.455 with only the feed-forward
 layers quantized), so I did not keep it (details in `DECISIONS.md`).
 
 ### Error analysis
 
-I annotated the 95 SciFact test errors of the main system plus 15 Climate-FEVER
-errors, with the help of an AI assistant (`results/Annotation_erreurs_annoté_110.xlsx`,
-table in `results/errors_table.md`). A second pass on 25 random errors, done by me alone
-without AI and without the first labels (same day, a few hours later), agrees on 24 of
-25 (Cohen's κ = 0.95, `results/kappa.json`). The short delay probably inflates this
-number.
+I annotated alone, by hand, the 95 SciFact test errors of the main system plus 15
+Climate-FEVER errors (`results/Annotation_erreurs_annoté_110.xlsx`, table in
+`results/errors_table.md`). A second pass on 25 random errors, without the first labels
+(same day, a few hours later), agrees on 24 of 25 (Cohen's κ = 0.95,
+`results/kappa.json`). The short delay probably inflates this number, and with a single
+annotator it shows that I apply the categories consistently, not that someone else would.
 
 | Category | Errors | Share |
 | --- | --- | --- |
@@ -310,15 +346,24 @@ make demo-offline    # no model download
 The page works like a proofreader's copy. Each claim of the answer is underlined with
 a line style per verdict (solid supported, double contradicted, dashed not in the
 sources, dotted unsure), so the meaning does not depend on colour alone. The margin
-holds one note per claim: verdict, confidence and the source sentence it is based on.
+holds one note per claim: verdict, confidence and the passage the model read (the
+sentence closest to the claim in full ink, the others lighter).
 For a contradicted claim the note is a small diff between the answer and the source,
 with only the words that differ marked (`4.35%` vs `3.45%`).
 
-- **Check an answer** splits an LLM answer into claims and annotates each one.
-- **Check one claim** checks one sentence against the indexed SciFact abstracts or
-  your own documents (pasted or .txt), with the three probabilities and the passages
-  read by the model.
-- **Audit log** shows the last verdicts with their model version, downloadable.
+- **Check one claim** (the core task) checks one sentence against the indexed SciFact
+  abstracts or your own documents (pasted or .txt), with the three probabilities and
+  the passages read by the model.
+- **Check an AI answer** (extension) splits an LLM answer into sentences and annotates
+  each one. Nothing is dropped silently: a sentence too short to check is shown as
+  "not checked", and questions or polite filler ("Hope this helps!") are listed as not
+  statements.
+- **Audit log** shows the last verdicts with their exact setup (model and weights
+  fingerprint, temperature, threshold, k), downloadable.
+
+The threshold and k are passed with each request, so two visitors never change each
+other's settings. The page listens on 127.0.0.1 unless `SERVER_NAME` is set (the Docker
+image sets 0.0.0.0), and Gradio's usage analytics are off.
 
 Every result shows the inference time and the model size.
 Invalid inputs (empty text, text without words, too long, wrong file type) give a
@@ -357,7 +402,7 @@ docker build -t claimguard .
 docker run -p 7860:7860 claimguard          # http://localhost:7860
 ```
 
-By default the image runs the offline config (rule-based baseline on a 20-document
+By default the image runs the offline config (rule-based baseline on the 12-document
 sample, no download), so it starts in a few seconds on any machine. To run the full
 system, mount my fine-tuned verifier and the processed SciFact data, and switch the
 config (Windows PowerShell: replace `$(pwd)` with `${PWD}`):
@@ -392,12 +437,13 @@ claimguard/
 │   ├── aggregate.py  calibrate.py  metrics.py  stats.py
 │   ├── pipeline.py  decompose.py  contrast.py  audit.py  efficiency.py  aggrefact.py
 │   ├── mcp_server.py  data.py  text.py  utils.py  multihop.py
-├── scripts/                 # train_verifier.py, evaluate.py, run_multihop.py, make_tables.py, make_figures.py, build_report.py
-├── notebooks/               # 03-06 Kaggle sessions (06 = multi-hop), 01 Colab, 02 error analysis
+├── scripts/                 # train_verifier.py, evaluate.py, run_multihop.py, session5.py, paired_tests.py,
+│                            # hover_claim_only.py, make_tables.py, make_figures.py, build_report.py
+├── notebooks/               # 03-08 Kaggle sessions (06-07 = multi-hop, 07 = review checks), 01 Colab, 02 error analysis
 ├── configs/                 # default.yaml, offline.yaml, train_verifier.yaml
-├── tests/                   # 74 tests: preprocessing, retrieval, metrics, model, pipeline, multi-hop
+├── tests/                   # 76 tests: preprocessing, retrieval, metrics, model, pipeline, multi-hop
 ├── app.py                   # Gradio demo
-├── Dockerfile  Makefile  requirements.txt  pyproject.toml
+├── Dockerfile  Makefile  requirements.txt  requirements-lock.txt  pyproject.toml  LICENSE
 ├── README.md  PLAN.md  DECISIONS.md
 └── report/                  # report draft -> report.pdf
 ```
@@ -435,6 +481,9 @@ claimguard/
 16. Tang, Laban & Durrett (2024). *MiniCheck: Efficient Fact-Checking of LLMs on Grounding Documents.* EMNLP.
 17. Laban et al. (2022). *SummaC: Re-Visiting NLI-based Models for Inconsistency Detection in Summarization.* TACL.
 18. Laurer et al. (2024). *Less Annotating, More Classifying.* Political Analysis (the NLI checkpoint).
+19. Jiang et al. (2020). *HoVer: A Dataset for Many-Hop Fact Extraction and Claim Verification.* Findings of EMNLP.
+20. Qwen Team (2024). *Qwen2.5 Technical Report.* arXiv:2412.15115 (the LLM judge).
+21. McNemar (1947). *Note on the sampling error of the difference between correlated proportions or percentages.* Psychometrika.
 
 Tools: PyTorch, Hugging Face Transformers, scikit-learn, Gradio, Model Context
 Protocol Python SDK. A coding assistant (Claude Code) was used while writing the
