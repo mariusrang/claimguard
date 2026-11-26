@@ -16,6 +16,8 @@
 FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
+    SERVER_NAME=0.0.0.0 \
+    GRADIO_ANALYTICS_ENABLED=False \
     PIP_NO_CACHE_DIR=1 \
     CLAIMGUARD_CONFIG=configs/offline.yaml \
     PORT=7860

@@ -91,6 +91,8 @@ offline demo; no result in the report comes from it.
 
 ## Model Architecture
 
+![ClaimGuard pipeline](results/figures/architecture.png)
+
 ```
 claim ──► BM25 ──────┐
       └─► dense ─────┴─► RRF fusion ─► top-50 ─► cross-encoder ─► top-k documents
@@ -368,6 +370,10 @@ docker run -p 7860:7860 -e CLAIMGUARD_CONFIG=configs/default.yaml \
 The image is CPU-only. If a model or the corpus is missing, the app falls back to the
 offline baseline and shows a note at the top of the page. A health check pings the
 page every 30 s (`docker ps` shows `healthy`).
+
+Tested on Windows 11 with Docker Desktop (26 Nov 2026): the image builds, the container
+is reported `healthy`, and the full system answers with the mounted fine-tuned verifier
+(about 0.8 s for a 5-sentence answer on a laptop CPU).
 
 ## Project Structure
 

@@ -5,7 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "claimguard"
 version = "0.1.0"
-description = "Evidence-based claim verification with calibrated abstention (NLP final project)"
+description = "Evidence-based claim verification with abstention (NLP final project)"
+license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = ["numpy", "scipy", "pyyaml"]
 

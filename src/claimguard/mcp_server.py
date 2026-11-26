@@ -58,8 +58,10 @@ def _short(result: ClaimResult) -> dict:
         "decision": result.decision,
         "label": result.label,
         "confidence": round(result.confidence, 3),
+        # the passage the verifier read for its most decisive score (up to 3 sentences)
         "evidence": best.text if best else None,
         "evidence_source": best.source if best else None,
+        **({"note": result.note} if result.note else {}),
     }
 
 
@@ -86,16 +88,21 @@ def verify_answer(answer: str, sources: list[str] | None = None) -> dict:
     claim plus a summary. Claims that are not SUPPORTED should be fixed or flagged.
     """
     try:
-        results = get_pipeline().verify_answer(answer, sources)
+        pipeline = get_pipeline()
+        results = pipeline.verify_answer(answer, sources)
     except InvalidInputError as err:
         return {"error": str(err)}
     verdicts = [_short(r) for r in results]
     n_ok = sum(v["decision"] == "SUPPORTED" for v in verdicts)
+    n_not_checked = sum(v["decision"] == "NOT_CHECKED" for v in verdicts)
     return {
-        "n_claims": len(verdicts),
+        "n_statements": len(verdicts),
         "n_supported": n_ok,
+        "n_not_checked": n_not_checked,
+        # everything that is not SUPPORTED needs a look, NOT_CHECKED included
         "n_flagged": len(verdicts) - n_ok,
         "claims": verdicts,
+        "ignored_sentences": pipeline.ignored_sentences(answer),
     }
 
 

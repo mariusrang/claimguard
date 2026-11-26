@@ -5,11 +5,17 @@
 
 E1  gold articles given: read them one by one (ClaimGuard, noisy-OR / max) vs together
     (joint reader), by number of hops; also with 3 distractor articles added.
+    Truncation control: one by one, but each article cut to the same number of words as in
+    the joint premise, so that "together" is not just "shorter".
 E2  retrieval in a closed pool: one BM25+rerank round vs two rounds (iterative),
     share of claims for which ALL the needed articles are found, by number of hops.
-E2b end to end: iterative retrieval + the best reader, compared with ClaimGuard.
-E3  (--train-joint) fine-tune the joint reader on HoVer train claims (never on dev).
+E2b end to end, 2 x 2: (one round | two rounds) x (one by one | together), reading the
+    top 5 and the top 10 articles, with McNemar tests along each factor.
+E3  (--train-joint) fine-tune the joint reader on HoVer train claims (never on dev),
+    once per seed in --reader-seeds; E2b uses the first seed, fixed in advance.
 
+The retrieval pool is built from the DEV claims only (their 100 TF-IDF candidates + their gold
+articles). Training articles are loaded separately and never enter the pool.
 HoVer has no public test labels, so the dev split is our test set: nothing is tuned on it.
 """
 
@@ -28,6 +34,7 @@ from claimguard.multihop import (
     PoolRetriever,
     WikiTexts,
     all_gold_found,
+    doc_text,
     gold_recall,
     hover_training_pairs,
     is_supported,
@@ -77,17 +84,23 @@ def run_readers(verifier, claims, docs_of, tag: str) -> dict:
     gold = np.array([c.supported for c in claims])
     preds = {"independent_noisy_or": [], "independent_max": [], "joint": []}
     start = time.perf_counter()
+    preds["independent_truncated"] = []
     for c in claims:
         docs = docs_of(c)
         preds["independent_noisy_or"].append(is_supported(verify_independent(verifier, c.claim, docs, "noisy_or")))
         preds["independent_max"].append(is_supported(verify_independent(verifier, c.claim, docs, "max_conf")))
         preds["joint"].append(is_supported(verify_joint(verifier, c.claim, docs)))
+        # control: same words as the joint premise, but each article read alone
+        share = max(20, 330 // max(1, len(docs)))
+        short = [(t, " ".join(doc_text(t, x).split()[:share])) for t, x in docs]
+        preds["independent_truncated"].append(
+            is_supported(verify_independent(verifier, c.claim, [("", x) for _, x in short], "noisy_or")))
     out = {"seconds": time.perf_counter() - start}
     for name, p in preds.items():
         p = np.array(p)
         out[name] = by_hops(claims, gold, p)
         out[name]["correct"] = (p == gold).astype(int).tolist()
-    for other in ("independent_noisy_or", "independent_max"):
+    for other in ("independent_noisy_or", "independent_max", "independent_truncated"):
         a = np.array(out["joint"]["correct"])
         b = np.array(out[other]["correct"])
         out[f"mcnemar_joint_vs_{other}"] = mcnemar_test(a, b)
@@ -111,6 +124,7 @@ def main() -> None:
     ap.add_argument("--out", default="results")
     ap.add_argument("--model-out", default="models/hover_joint_reader", help="where E3 saves its reader")
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--reader-seeds", type=int, nargs="+", default=[13], help="E3: one trained reader per seed")
     args = ap.parse_args()
     set_seed(args.seed)
     hover_dir, out_dir = Path(args.hover_dir), Path(args.out)
@@ -119,19 +133,23 @@ def main() -> None:
     dev = load_hover(hover_dir / "hover_dev_release_v1.1.json", args.per_cell, args.seed)
     train = load_hover(hover_dir / "hover_train_release_v1.1.json", args.train_per_cell, args.seed) if args.train_joint else []
     tfidf_file = hover_dir / "dev_tfidf_doc_retrieval_results.json"
-    gold_needed = {t for c in dev + train for t in c.gold_titles}
+    dev_gold = {t for c in dev for t in c.gold_titles}
+    train_gold = {t for c in train for t in c.gold_titles}
     if tfidf_file.exists():
-        # pool = the 100 TF-IDF candidates of the HoVer authors for each claim + the gold articles
+        # pool = the 100 TF-IDF candidates of the HoVer authors for each DEV claim + the dev gold
+        # articles; the articles of the training claims are NOT added (they would be free,
+        # easy-to-skip distractors that a real pool would not contain)
         tfidf = load_tfidf(tfidf_file, {c.uid for c in dev})
-        wiki = load_wiki(args, gold_needed | {t for ts in tfidf.values() for t in ts})
-        pool_kind = "tfidf_top100_plus_gold"
+        wiki = load_wiki(args, dev_gold | {t for ts in tfidf.values() for t in ts})
+        pool_kind = "dev_tfidf_top100_plus_dev_gold"
     else:
         # fallback if the UNC server is down: gold articles + the first N articles of the dump
         # as distractors, and our own BM25 top-100 plays the role of the TF-IDF candidates
-        wiki = WikiTexts.from_beir(args.wiki, gold_needed, extra=args.fallback_distractors)
+        wiki = WikiTexts.from_beir(args.wiki, dev_gold, extra=args.fallback_distractors)
         index = PoolRetriever(wiki, reranker=None).index
         tfidf = {c.uid: [t for t, _ in index.search(c.claim, 100)] for c in dev}
-        pool_kind = f"gold_plus_{args.fallback_distractors}_first_articles"
+        pool_kind = f"dev_gold_plus_{args.fallback_distractors}_first_articles"
+    train_wiki = load_wiki(args, train_gold) if train else None  # training only, never in the pool
     coverage = sum(all(t in wiki for t in c.gold_titles) for c in dev) / len(dev)
     print(f"{len(dev)} dev claims, {len(train)} train claims, {len(wiki)} articles loaded, gold coverage {coverage:.3f}")
     dev = [c for c in dev if all(t in wiki for t in c.gold_titles)]  # drop the few claims with a missing article
@@ -154,19 +172,21 @@ def main() -> None:
     if args.train_joint:
         from claimguard.verify.train import train_verifier
 
-        pairs = hover_training_pairs(train, wiki)
+        pairs = hover_training_pairs(train, train_wiki)
         rng = np.random.default_rng(args.seed)
         idx = rng.permutation(len(pairs))
         n_val = max(200, len(pairs) // 10)  # validation taken from TRAIN claims, not from dev
         val, tr = [pairs[i] for i in idx[:n_val]], [pairs[i] for i in idx[n_val:]]
-        t0 = time.perf_counter()
-        history = train_verifier(
-            tr, val, args.model_out, base_model=args.verifier, lr=2e-5,
-            epochs=args.epochs, batch_size=8, max_length=512, fp16=torch.cuda.is_available(), seed=args.seed,
-        )
-        results["e3_training"] = {"n_train": len(tr), "n_val": len(val), "minutes": (time.perf_counter() - t0) / 60,
-                                  "history": history}
-        verifiers["hover_joint_trained"] = args.model_out
+        results["e3_training"] = {"n_train": len(tr), "n_val": len(val), "runs": {}}
+        for i, seed in enumerate(args.reader_seeds):
+            folder = args.model_out if i == 0 else f"{args.model_out}-seed{seed}"
+            t0 = time.perf_counter()
+            history = train_verifier(
+                tr, val, folder, base_model=args.verifier, lr=2e-5,
+                epochs=args.epochs, batch_size=8, max_length=512, fp16=torch.cuda.is_available(), seed=seed,
+            )
+            results["e3_training"]["runs"][str(seed)] = {"minutes": (time.perf_counter() - t0) / 60, "history": history}
+            verifiers["hover_joint_trained" if i == 0 else f"hover_joint_trained_seed{seed}"] = folder
 
     # E1: gold articles, then gold + 3 distractors
     gold_docs = lambda c: [(t, wiki.get(t)) for t in c.gold_titles]  # noqa: E731
@@ -223,15 +243,28 @@ def main() -> None:
     verifier = NLIVerifier(verifiers[best], max_length=512, batch_size=16)
     gold = np.array([c.supported for c in dev])
     e2b = {"reader": best}
-    for mode in ("single_shot", "iterative"):
+    for k in (5, 10):
+        correct = {}
+        for mode in ("single_shot", "iterative"):
+            for reading in ("independent_noisy_or", "joint"):
+                preds = []
+                for r, c in zip(retrieved[mode], dev):
+                    docs = [(t, wiki.get(t)) for t in r[:k]]
+                    probs = (verify_joint(verifier, c.claim, docs) if reading == "joint"
+                             else verify_independent(verifier, c.claim, docs, "noisy_or"))
+                    preds.append(is_supported(probs))
+                preds = np.array(preds)
+                e2b[f"top{k}:{mode}+{reading}"] = by_hops(dev, gold, preds)
+                correct[(mode, reading)] = (preds == gold).astype(int)
+        # one factor at a time, the other fixed
+        for mode in ("single_shot", "iterative"):
+            e2b[f"top{k}:mcnemar_joint_vs_independent|{mode}"] = mcnemar_test(
+                correct[(mode, "joint")], correct[(mode, "independent_noisy_or")])
         for reading in ("independent_noisy_or", "joint"):
-            preds = []
-            for r, c in zip(retrieved[mode], dev):
-                docs = [(t, wiki.get(t)) for t in r[:5]]
-                probs = (verify_joint(verifier, c.claim, docs) if reading == "joint"
-                         else verify_independent(verifier, c.claim, docs, "noisy_or"))
-                preds.append(is_supported(probs))
-            e2b[f"{mode}+{reading}"] = by_hops(dev, gold, np.array(preds))
+            e2b[f"top{k}:mcnemar_iterative_vs_single|{reading}"] = mcnemar_test(
+                correct[("iterative", reading)], correct[("single_shot", reading)])
+        e2b[f"top{k}:mcnemar_best_vs_claimguard"] = mcnemar_test(
+            correct[("iterative", "joint")], correct[("single_shot", "independent_noisy_or")])
     results["e2b_end_to_end"] = e2b
     save_json(out_dir / "multihop.json", results)
     plot(results, out_dir / "figures" / "multihop.png")

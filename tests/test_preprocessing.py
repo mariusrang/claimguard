@@ -115,3 +115,19 @@ def test_config_inheritance():
     assert cfg["verifier"]["kind"] == "lexical"  # overridden
     assert cfg["retrieval"]["rrf_k"] == 60  # inherited from default.yaml
     assert deep_update({"a": {"b": 1, "c": 2}}, {"a": {"b": 5}}) == {"a": {"b": 5, "c": 2}}
+
+
+def test_no_sentence_disappears_silently():
+    """Bug found in review: a wrong statement after "Please note that" was dropped."""
+    from claimguard.decompose import analyse_answer
+
+    answer = ("Please note that early repayment is free. Here is the key point: the rate is 1% for all "
+              "clients. Sure, application fees are 900 euros. Fees: none. Is that clear? Hope this helps!")
+    segs = analyse_answer(answer)
+    claims = [s.text for s in segs if s.status == "claim"]
+    assert claims[:3] == ["Early repayment is free.", "The rate is 1% for all clients.",
+                          "Application fees are 900 euros."]
+    statuses = {s.original: s.status for s in segs}
+    assert statuses["Is that clear?"] == "ignored" and statuses["Hope this helps!"] == "ignored"
+    assert statuses["Fees: none."] in ("claim", "too_short")  # never dropped: checked or NOT_CHECKED
+    assert len(segs) == 6  # every sentence has a status

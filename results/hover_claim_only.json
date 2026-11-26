@@ -1,0 +1,17 @@
+{
+  "n_train": 18171,
+  "n_dev": 600,
+  "accuracy": 0.5616666666666666,
+  "ci95": {
+    "value": 0.5616666666666666,
+    "low": 0.5216666666666666,
+    "high": 0.6016666666666667
+  },
+  "accuracy_by_hops": {
+    "2": 0.585,
+    "3": 0.6,
+    "4": 0.5
+  },
+  "chance": 0.5,
+  "model": "tf-idf (1-2 grams) + logistic regression, claim text only"
+}

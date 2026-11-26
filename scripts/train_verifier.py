@@ -97,7 +97,7 @@ def main() -> None:
             folder = out_dir if i == 0 else f"{out_dir}-seed{seed}"
             summaries.append({"seed": seed, "dir": folder, **run_one(cfg, seed, folder)})
         f1s = [s["best_dev_macro_f1"] for s in summaries]
-        print(f"dev macro-F1 over {len(seeds)} seeds: {np.mean(f1s):.4f} +- {np.std(f1s):.4f}")
+        print(f"dev macro-F1 over {len(seeds)} seeds: {np.mean(f1s):.4f} +- {np.std(f1s, ddof=1):.4f} (sample std)")
         save_json(results_dir / "train_seeds.json", summaries)
         return
 

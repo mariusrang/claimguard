@@ -9,6 +9,8 @@ Two ways to use it:
 
 from __future__ import annotations
 
+import hashlib
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -18,7 +20,7 @@ from claimguard import LABELS, __version__
 from claimguard.aggregate import aggregate
 from claimguard.audit import AuditLogger
 from claimguard.data import Document, load_corpus
-from claimguard.decompose import split_into_claims
+from claimguard.decompose import analyse_answer
 from claimguard.retrieval.bm25 import BM25Index
 from claimguard.retrieval.rerank import LexicalReranker, rerank
 from claimguard.text import split_sentences
@@ -72,6 +74,9 @@ class ClaimResult:
     evidence: list[Evidence] = field(default_factory=list)
     retrieved: list[str] = field(default_factory=list)  # first-stage ranking (for metrics)
     timings_ms: dict = field(default_factory=dict)
+    top_k: int = 0  # number of documents read for this verdict
+    model_version: str = ""  # setup that produced this verdict (also written to the audit log)
+    note: str = ""  # why a sentence was not checked (decision NOT_CHECKED)
 
     def to_dict(self) -> dict:
         """JSON-ready view of the result (used by the MCP server and the audit log)."""
@@ -118,22 +123,28 @@ class ClaimGuard:
         self.n_sentences = n_sentences
         self.depth = depth
         self.audit = audit
-        if audit is not None and not audit.model_version:
-            audit.model_version = self.model_version
 
     @property
     def model_version(self) -> str:
-        """String stored in the audit log so a verdict can be traced to a setup."""
+        """Setup with the default threshold and top_k (see version_for for one verdict)."""
+        return self.version_for(self.threshold, self.top_k)
+
+    def version_for(self, threshold: float, top_k: int) -> str:
+        """String stored with each verdict so it can be traced to the exact setup.
+
+        The weights fingerprint (sha256 of the checkpoint file) changes if the model
+        files change even when the folder name stays the same."""
         name = getattr(self.verifier, "name", type(self.verifier).__name__)
+        weights = getattr(self.verifier, "weights_sha", "")
         return (
-            f"claimguard={__version__};verifier={name};agg={self.aggregation};"
-            f"T={self.temperature:.3f};threshold={self.threshold:.2f}"
+            f"claimguard={__version__};verifier={name}{'@' + weights if weights else ''};"
+            f"agg={self.aggregation};T={self.temperature:.3f};threshold={threshold:.2f};top_k={top_k}"
         )
 
     # ---- step 1 + 2: find candidate documents ----
 
     def _rank_documents(
-        self, claim: str, corpus: dict[str, Document], retriever, timings: dict
+        self, claim: str, corpus: dict[str, Document], retriever, timings: dict, top_k: int
     ) -> tuple[list[str], list[tuple[str, float]]]:
         """Return (first-stage ranking, [(doc_id, rerank score)] for the top_k docs)."""
         with timer(timings, "retrieval"):
@@ -141,10 +152,10 @@ class ClaimGuard:
         with timer(timings, "rerank"):
             if self.reranker is None:
                 # no reranker: keep the retriever order, fake decreasing scores
-                top = [(d, 1.0 / (i + 1)) for i, d in enumerate(first_stage[: self.top_k])]
+                top = [(d, 1.0 / (i + 1)) for i, d in enumerate(first_stage[:top_k])]
             else:
                 texts = [corpus[d].text for d in first_stage]
-                top = [(first_stage[i], s) for i, s in rerank(self.reranker, claim, texts, self.top_k)]
+                top = [(first_stage[i], s) for i, s in rerank(self.reranker, claim, texts, top_k)]
         return first_stage, top
 
     # ---- step 3 + 4: pick sentences and verify ----
@@ -168,32 +179,59 @@ class ClaimGuard:
             for i, (doc_id, title, picked, text, score) in enumerate(selected)
         ]
 
-    def _finish(self, claim: str, evidence: list[Evidence], retrieved: list[str], timings: dict, mode: str) -> ClaimResult:
+    def _finish(
+        self, claim: str, evidence: list[Evidence], retrieved: list[str], timings: dict, mode: str,
+        threshold: float | None = None, top_k: int = 0,
+    ) -> ClaimResult:
         """Step 5: aggregate, apply the abstention threshold, write the audit log."""
+        threshold = self.threshold if threshold is None else threshold
         probs = aggregate(np.array([e.probs for e in evidence]).reshape(-1, 3), self.aggregation)
         idx = int(probs.argmax())
         confidence = float(probs[idx])
-        decision = LABELS[idx] if confidence >= self.threshold else "UNCERTAIN"
+        decision = LABELS[idx] if confidence >= threshold else "UNCERTAIN"
         result = ClaimResult(
             claim=claim,
             label=LABELS[idx],
             confidence=confidence,
             decision=decision,
             probs=probs.tolist(),
-            threshold=self.threshold,
+            threshold=threshold,
             evidence=evidence,
             retrieved=retrieved,
             timings_ms={k: round(v, 2) for k, v in timings.items()},
+            top_k=top_k or len(evidence),
+            model_version=self.version_for(threshold, top_k or len(evidence)),
         )
         if self.audit is not None:
             self.audit.log(result.to_dict(), mode=mode)
         return result
 
+    def _not_checked(self, sentence: str, reason: str, threshold: float | None) -> ClaimResult:
+        """A sentence of an answer that was not verified: reported, never dropped silently."""
+        threshold = self.threshold if threshold is None else threshold
+        result = ClaimResult(
+            claim=sentence, label="NOT_CHECKED", confidence=0.0, decision="NOT_CHECKED",
+            probs=[0.0, 0.0, 0.0], threshold=threshold, note=reason,
+            model_version=self.version_for(threshold, 0),
+        )
+        if self.audit is not None:
+            self.audit.log(result.to_dict(), mode="not_checked")
+        return result
+
     # ---- public API ----
 
-    def verify_claim(self, claim: str, sources: list[str] | None = None) -> ClaimResult:
-        """Verify one claim against the indexed corpus, or against `sources` if given."""
+    def verify_claim(
+        self, claim: str, sources: list[str] | None = None, threshold: float | None = None,
+        top_k: int | None = None, min_words: int = 3,
+    ) -> ClaimResult:
+        """Verify one claim against the indexed corpus, or against `sources` if given.
+
+        threshold and top_k can be set per call (the demo has one slider per user, so they
+        must not change the shared pipeline object)."""
         claim = validate_text(claim, MAX_CLAIM_CHARS, "claim")
+        if len(claim.split()) < min_words:
+            raise InvalidInputError(f"Type a full factual sentence (at least {min_words} words).")
+        top_k = self.top_k if top_k is None else int(top_k)
         timings: dict = {}
         if sources:
             corpus = chunk_sources([s for s in sources if isinstance(s, str) and s.strip()])
@@ -206,12 +244,12 @@ class ClaimGuard:
             if self.retriever is None or not self.corpus:
                 raise InvalidInputError("No corpus is loaded: please give source documents.")
             corpus, retriever, mode = self.corpus, self.retriever, "verify_claim_corpus"
-        first_stage, top = self._rank_documents(claim, corpus, retriever, timings)
+        first_stage, top = self._rank_documents(claim, corpus, retriever, timings, top_k)
         if sources and not top:
             # BM25 found no shared word at all: still look at the first chunks
-            top = [(d, 0.0) for d in list(corpus)[: self.top_k]]
+            top = [(d, 0.0) for d in list(corpus)[:top_k]]
         evidence = self._verify_documents(claim, corpus, top, timings)
-        return self._finish(claim, evidence, first_stage, timings, mode)
+        return self._finish(claim, evidence, first_stage, timings, mode, threshold, top_k)
 
     def verify_with_evidence(self, claim: str, evidence_texts: list[str], mode: str = "given_evidence") -> ClaimResult:
         """Skip retrieval: the evidence is given (oracle experiments, citation checking)."""
@@ -227,13 +265,31 @@ class ClaimGuard:
         ]
         return self._finish(claim, evidence, [], timings, mode)
 
-    def verify_answer(self, answer: str, sources: list[str] | None = None) -> list[ClaimResult]:
-        """Split an LLM answer into claims and verify each one."""
+    def verify_answer(
+        self, answer: str, sources: list[str] | None = None, threshold: float | None = None,
+        top_k: int | None = None,
+    ) -> list[ClaimResult]:
+        """Split an LLM answer into sentences and verify each factual one.
+
+        Every statement comes back: a sentence too short to check gets the decision
+        NOT_CHECKED (it counts as something to review). Questions and courtesy sentences
+        ("Hope this helps!") are skipped; ignored_sentences() lists them."""
         answer = validate_text(answer, MAX_ANSWER_CHARS, "answer")
-        claims = split_into_claims(answer)
-        if not claims:
-            raise InvalidInputError("No factual claim was found in this text.")
-        return [self.verify_claim(c, sources) for c in claims]
+        segments = analyse_answer(answer)
+        if not any(s.status != "ignored" for s in segments):
+            raise InvalidInputError("No factual statement was found in this text.")
+        results = []
+        for seg in segments:
+            if seg.status == "claim":
+                results.append(self.verify_claim(seg.text, sources, threshold, top_k, min_words=1))
+            elif seg.status == "too_short":
+                results.append(self._not_checked(seg.original, seg.reason, threshold))
+        return results
+
+    @staticmethod
+    def ignored_sentences(answer: str) -> list[dict]:
+        """Sentences of an answer that are not statements (questions, courtesy)."""
+        return [{"sentence": s.original, "reason": s.reason} for s in analyse_answer(answer) if s.status == "ignored"]
 
     def verify_citations(self, items: list[dict]) -> list[ClaimResult]:
         """Check that each cited passage really supports its sentence.
@@ -290,6 +346,18 @@ def build_reranker(cfg: dict):
     raise ValueError(f"unknown rerank kind '{kind}'")
 
 
+def weights_fingerprint(model: str) -> str:
+    """First 12 hex digits of the sha256 of a local checkpoint ('' for a hub name)."""
+    path = Path(model) / "model.safetensors"
+    if not path.exists():
+        return ""
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()[:12]
+
+
 def build_verifier(cfg: dict):
     """NLI verifier (fine-tuned folder or hub checkpoint), LLM judge or rule-based baseline."""
     kind = cfg.get("kind", "lexical")
@@ -304,10 +372,15 @@ def build_verifier(cfg: dict):
         fallback = cfg.get("fallback_model")
         # if the fine-tuned folder does not exist yet, fall back to the public checkpoint
         looks_local = model.startswith(("models/", "./", "/"))
+        fallback_from = ""
         if fallback and (not model or (looks_local and not Path(model).exists())):
-            print(f"[claimguard] '{model}' not found, using the public checkpoint {fallback}")
-            model = fallback
-        return NLIVerifier(model, cfg.get("max_length", 384), cfg.get("batch_size", 32))
+            # stderr, not stdout: the MCP server speaks JSON on stdout
+            print(f"[claimguard] '{model}' not found, using the public checkpoint {fallback}", file=sys.stderr)
+            fallback_from, model = model, fallback
+        verifier = NLIVerifier(model, cfg.get("max_length", 384), cfg.get("batch_size", 32))
+        verifier.fallback_from = fallback_from  # shown as a warning in the demo
+        verifier.weights_sha = weights_fingerprint(model)
+        return verifier
     if kind == "llm":
         from claimguard.verify.llm_judge import LLMJudgeVerifier
 

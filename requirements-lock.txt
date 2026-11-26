@@ -1,0 +1,20 @@
+# Exact versions on which the 76 tests pass (Linux, Python 3.13.18, CPU), 26 Nov 2026.
+# requirements.txt keeps lower bounds; use this file to reproduce the tested setup:
+#   pip install -r requirements-lock.txt
+# The Kaggle GPU runs used the Kaggle image's torch/CUDA build with the same project code.
+numpy==2.5.3
+scipy==1.18.1
+PyYAML==6.0.3
+torch==2.15.0
+transformers==5.23.0
+sentencepiece==0.2.3
+protobuf==7.36.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+gradio==6.32.0
+mcp==2.3.0
+huggingface-hub==2.4.0
+tokenizers==0.23.3
+safetensors==0.8.0
+pytest==9.1.1
+ruff==0.17.5

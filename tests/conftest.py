@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-from claimguard.data import load_claims, load_corpus
+from claimguard.data import ensure_processed_sample, load_claims, load_corpus
 from claimguard.pipeline import ClaimGuard
 from claimguard.retrieval.bm25 import BM25Index
 from claimguard.retrieval.rerank import LexicalReranker
@@ -20,16 +18,10 @@ SAMPLE = ROOT / "data" / "sample"
 
 @pytest.fixture(scope="session", autouse=True)
 def processed_sample():
-    """On a fresh clone data/processed/sample does not exist yet (it is made by `make sample`).
-    The demo test needs it, so build it once here: plain `pytest` then works without make."""
-    out = ROOT / "data" / "processed" / "sample"
-    if not (out / "corpus.jsonl").exists():
-        for script, args in (
-            ("preprocess.py", ["--raw", str(SAMPLE), "--out", str(out)]),
-            ("build_contrast_set.py", ["--data", str(out)]),
-        ):
-            subprocess.run([sys.executable, str(ROOT / "data" / "scripts" / script), *args], check=True, cwd=ROOT)
-    return out
+    """On a fresh clone data/processed/sample does not exist yet: build it once, so plain
+    `pytest` works without make (same function as the demo)."""
+    return ensure_processed_sample(ROOT)
+
 
 WORDS = (
     "vitamin c does not reduce the incidence of colds aspirin risk heart attack statins lower "

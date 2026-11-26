@@ -15,7 +15,7 @@ import numpy as np
 
 from claimguard import LABELS, NEI
 from claimguard.data import Claim, Document
-from claimguard.metrics import accuracy, macro_f1
+from claimguard.metrics import accuracy, per_class_prf
 from claimguard.retrieval.rerank import LexicalReranker, rerank
 from claimguard.utils import ensure_float32, save_json, set_seed
 from claimguard.verify.nli import NLIVerifier, map_model_labels
@@ -104,11 +104,22 @@ def load_model_for_training(base_model: str):
 
 
 def evaluate_pairs(verifier, pairs: list[Pair]) -> dict:
-    """Accuracy and macro-F1 of a verifier on labelled pairs."""
+    """Accuracy and macro-F1 of a verifier on labelled pairs.
+
+    The macro-F1 averages over the classes present in the gold labels: on HoVer there is no
+    REFUTED class, and counting its F1 of 0 would cap the score at 2/3 for no reason.
+    On SciFact the three classes are present, so nothing changes there."""
     logits = verifier.predict_logits([(c, e) for c, e, _ in pairs])
     preds = logits.argmax(axis=1)
     gold = np.array([y for _, _, y in pairs])
-    return {"accuracy": accuracy(gold, preds), "macro_f1": macro_f1(gold, preds), "n": len(pairs)}
+    per_class = per_class_prf(gold, preds)
+    present = sorted(set(gold.tolist()))
+    return {
+        "accuracy": accuracy(gold, preds),
+        "macro_f1": float(np.mean([per_class[c]["f1"] for c in present])),
+        "classes": present,
+        "n": len(pairs),
+    }
 
 
 def train_verifier(

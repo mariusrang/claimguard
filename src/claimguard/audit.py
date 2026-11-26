@@ -29,12 +29,14 @@ class AuditLogger:
         record = {
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "mode": mode,
-            "model_version": self.model_version,
+            "model_version": result.get("model_version") or self.model_version,
             "claim": result["claim"],
             "label": result["label"],
             "confidence": round(float(result["confidence"]), 4),
             "decision": result["decision"],
             "threshold": result.get("threshold", 0.0),
+            "top_k": result.get("top_k", 0),
+            "note": result.get("note", ""),
             "evidence": [
                 {
                     "source": e["source"],

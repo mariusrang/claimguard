@@ -9,9 +9,13 @@ rely on colour alone) and numbered, and the margin holds the proofreader's note:
 verdict, confidence and the passage the decision is based on.
 
 Tabs:
-1. Check an answer - splits an LLM answer into claims and annotates each one
-2. Check one claim - one claim, against the indexed corpus or documents you paste
-3. Audit log       - every verdict with its model version, downloadable
+1. Check one claim - the core of the project: one claim against the indexed corpus
+                     (retrieval, reranking, verification, aggregation) or your documents
+2. Check an answer - extension: splits an LLM answer into sentences and annotates each one
+3. Audit log       - every verdict with its exact setup, downloadable
+
+The page listens on 127.0.0.1 by default (set SERVER_NAME=0.0.0.0 to expose it, as the
+Docker image does) and Gradio's usage analytics are switched off.
 """
 
 from __future__ import annotations
@@ -19,15 +23,19 @@ from __future__ import annotations
 import html
 import inspect
 import os
+import sys
 import time
 from pathlib import Path
 
-import gradio as gr
+os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")  # no telemetry, set before importing gradio
 
-from claimguard import LABELS
-from claimguard.pipeline import ClaimGuard, ClaimResult, InvalidInputError, build_pipeline
-from claimguard.text import split_sentences, tokenize
-from claimguard.utils import load_config
+import gradio as gr  # noqa: E402
+
+from claimguard import LABELS  # noqa: E402
+from claimguard.data import ensure_processed_sample  # noqa: E402
+from claimguard.pipeline import ClaimGuard, ClaimResult, InvalidInputError, build_pipeline  # noqa: E402
+from claimguard.text import split_sentences, tokenize  # noqa: E402
+from claimguard.utils import load_config  # noqa: E402
 
 CONFIG_PATH = os.environ.get("CLAIMGUARD_CONFIG", "configs/default.yaml")
 MAX_UPLOAD_BYTES = 2_000_000
@@ -38,26 +46,42 @@ VERDICT_TEXT = {
     "REFUTED": "Contradicted by the sources",
     "NEI": "Not in the sources",
     "UNCERTAIN": "Unsure, check it yourself",
+    "NOT_CHECKED": "Not checked, read it yourself",
 }
-SHORT = {"SUPPORTED": "Supported", "REFUTED": "Contradicted", "NEI": "Not in the sources", "UNCERTAIN": "Unsure"}
-CSS_CLASS = {"SUPPORTED": "ok", "REFUTED": "no", "NEI": "na", "UNCERTAIN": "un"}
+SHORT = {"SUPPORTED": "Supported", "REFUTED": "Contradicted", "NEI": "Not in the sources", "UNCERTAIN": "Unsure",
+         "NOT_CHECKED": "Not checked"}
+CSS_CLASS = {"SUPPORTED": "ok", "REFUTED": "no", "NEI": "na", "UNCERTAIN": "un", "NOT_CHECKED": "nc"}
+
+
+OFFLINE_NOTE = (
+    "Offline mode: rule-based baseline (no neural model) on a {n}-document sample corpus. "
+    "Its confidence is not calibrated; use it to try the interface, not to judge the system."
+)
 
 
 def load_pipeline() -> tuple[ClaimGuard, str]:
-    """Build the pipeline. If the models cannot be loaded, fall back to the offline config."""
+    """Build the pipeline. If the full system cannot be loaded, fall back to the offline config,
+    and always say on the page which system is running."""
+    ensure_processed_sample(".")  # the offline sample must exist even on a fresh clone
     try:
         cfg = load_config(CONFIG_PATH)
         if not Path(cfg["data"]["dir"], "corpus.jsonl").exists():
             # e.g. a fresh clone or the Docker image without the SciFact data mounted
             raise FileNotFoundError(f"no corpus in {cfg['data']['dir']}")
-        return build_pipeline(cfg), ""
+        pipeline = build_pipeline(cfg)
+        note = ""
+        if cfg.get("verifier", {}).get("kind") == "lexical":
+            note = OFFLINE_NOTE.format(n=len(pipeline.corpus))
+        elif getattr(pipeline.verifier, "fallback_from", ""):
+            note = (f"Your fine-tuned verifier ({pipeline.verifier.fallback_from}) was not found: this page "
+                    f"runs the public zero-shot checkpoint {pipeline.verifier.name} instead.")
+        return pipeline, note
     except Exception as err:  # no internet, missing checkpoint... the demo should still start
-        note = (
-            f"The full system could not be loaded ({type(err).__name__}: {err}), so this page runs "
-            "the rule-based baseline on a 20-document sample. Its confidence is not calibrated."
-        )
-        print(note, err)
-        return build_pipeline(load_config("configs/offline.yaml")), note
+        print(f"[claimguard] full system not loaded: {type(err).__name__}: {err}", file=sys.stderr)
+        pipeline = build_pipeline(load_config("configs/offline.yaml"))
+        note = (f"The full system could not be loaded ({type(err).__name__}). "
+                + OFFLINE_NOTE.format(n=len(pipeline.corpus)))
+        return pipeline, note
 
 
 PIPELINE, STARTUP_NOTE = load_pipeline()
@@ -165,6 +189,16 @@ def word_diff(claim: str, source: str) -> str:
     )
 
 
+def mark_passage(passage: str, closest: str, claim: str) -> str:
+    """The whole passage the verifier read; the sentence closest to the claim in full ink,
+    the others lighter, and the words shared with the claim marked."""
+    parts = []
+    for sentence in split_sentences(passage) or [passage]:
+        marked = mark_shared_words(sentence, claim)
+        parts.append(marked if sentence.strip() == closest.strip() else f"<span class='dim'>{marked}</span>")
+    return " ".join(parts)
+
+
 def message(text: str, kind: str = "error") -> str:
     """Error or empty state, in the interface's voice."""
     return f"<div class='cg-msg cg-msg-{kind}'>{html.escape(text)}</div>"
@@ -173,8 +207,9 @@ def message(text: str, kind: str = "error") -> str:
 # ---------------------------------------------------------------- tab 1: answer
 
 
-def summary_bar(results: list[ClaimResult]) -> str:
-    """One sentence + a thin bar with the share of each verdict."""
+def summary_bar(results: list[ClaimResult], ignored: list[dict] | None = None) -> str:
+    """One sentence + a thin bar with the share of each verdict. Nothing is hidden: sentences
+    that could not be checked are counted as things to review, ignored ones are listed."""
     counts = {k: sum(r.decision == k for r in results) for k in VERDICT_TEXT}
     n = len(results)
     flagged = n - counts["SUPPORTED"]
@@ -185,16 +220,23 @@ def summary_bar(results: list[ClaimResult]) -> str:
         parts.append(f"{counts['NEI']} not in the sources")
     if counts["UNCERTAIN"]:
         parts.append(f"{counts['UNCERTAIN']} unsure")
+    if counts["NOT_CHECKED"]:
+        parts.append(f"{counts['NOT_CHECKED']} not checked")
     if flagged == 0:
         sentence = f"All {n} claims are supported by your sources."
     else:
-        sentence = f"{n} claims checked, {flagged} to review: " + ", ".join(parts) + "."
+        sentence = f"{n} claims, {flagged} to review: " + ", ".join(parts) + "."
     segments = "".join(
         f"<span class='seg {CSS_CLASS[k]}' style='flex:{c}' title='{SHORT[k]}: {c}'></span>"
         for k, c in counts.items()
         if c
     )
-    return f"<div class='cg-summary'><p>{html.escape(sentence)}</p><div class='cg-bar'>{segments}</div></div>"
+    skipped = ""
+    if ignored:
+        listed = "; ".join(f"\u201c{html.escape(i['sentence'])}\u201d" for i in ignored)
+        skipped = f"<p class='cg-ignored'>Not statements, so not checked: {listed}.</p>"
+    return (f"<div class='cg-summary'><p>{html.escape(sentence)}</p><div class='cg-bar'>{segments}</div>"
+            f"{skipped}</div>")
 
 
 def annotated_page(answer_results: list[ClaimResult]) -> str:
@@ -207,20 +249,25 @@ def annotated_page(answer_results: list[ClaimResult]) -> str:
             f"<sup>{i}</sup></span>"
         )
         ev = best_evidence(r)
-        if ev is None:
+        if r.decision == "NOT_CHECKED":
+            quote = f"<blockquote class='faint'>{html.escape(r.note.capitalize())}: read this sentence yourself.</blockquote>"
+        elif ev is None:
             quote = "<blockquote>No passage of the sources is related to this claim.</blockquote>"
         else:
             sent, overlap = closest_sentence(ev.text, r.claim)
             if r.decision == "REFUTED" and overlap >= 0.3:
                 body = word_diff(r.claim, sent)  # show exactly what the answer changed
-            elif r.decision == "NEI":
-                body = f"<blockquote class='faint'>Closest passage: {mark_shared_words(sent, r.claim)}</blockquote>"
             else:
-                body = f"<blockquote>{mark_shared_words(sent, r.claim)}</blockquote>"
+                body = ""
+            # the verifier read the whole passage (up to 3 sentences), not only the closest one
+            label = "Closest passage" if r.decision == "NEI" else "Passage read by the model"
+            passage = mark_passage(ev.text, sent, r.claim)
+            body += f"<blockquote class='{'faint' if r.decision == 'NEI' else ''}'><span class='lbl'>{label}:</span> {passage}</blockquote>"
             quote = f"{body}<cite>{html.escape(ev.source)}</cite>"
         notes.append(
             f"<li class='{cls}'><div class='note-head'><b>{i}</b> {SHORT[r.decision]}"
-            f"<span class='conf'>{r.confidence:.0%} confidence</span></div>{quote}</li>"
+            + ("" if r.decision == "NOT_CHECKED" else f"<span class='conf'>{r.confidence:.0%} confidence</span>")
+            + f"</div>{quote}</li>"
         )
     return (
         "<div class='cg-page'>"
@@ -236,9 +283,8 @@ def check_answer_ui(answer: str, sources_text: str, sources_file: str | None, th
         sources = read_sources(sources_text, sources_file)
         if not sources:
             raise InvalidInputError("Paste or upload the documents the answer should be based on.")
-        PIPELINE.threshold = float(threshold)
         start = time.perf_counter()
-        results = PIPELINE.verify_answer(answer, sources)
+        results = PIPELINE.verify_answer(answer, sources, threshold=float(threshold))
         total_ms = (time.perf_counter() - start) * 1000
     except InvalidInputError as err:
         return message(str(err)), "", []
@@ -248,8 +294,10 @@ def check_answer_ui(answer: str, sources_text: str, sources_file: str | None, th
     for r in results:
         for k, v in r.timings_ms.items():
             timings[k] = timings.get(k, 0.0) + v
-    rows = [[i, r.claim, SHORT[r.decision], f"{r.confidence:.0%}"] for i, r in enumerate(results, start=1)]
-    return summary_bar(results), annotated_page(results) + footer(total_ms, timings), rows
+    rows = [[i, r.claim, SHORT[r.decision], "-" if r.decision == "NOT_CHECKED" else f"{r.confidence:.0%}"]
+            for i, r in enumerate(results, start=1)]
+    summary = summary_bar(results, PIPELINE.ignored_sentences(answer))
+    return summary, annotated_page(results) + footer(total_ms, timings), rows
 
 
 # ---------------------------------------------------------------- tab 2: one claim
@@ -296,12 +344,10 @@ def claim_card(result: ClaimResult) -> str:
 def verify_claim_ui(claim: str, sources_text: str, sources_file: str | None, threshold: float, top_k: int):
     """Handler of tab 2: the verdict card, the probabilities (for the Label) and the footer."""
     try:
-        if claim and len(claim.split()) < 3:
-            raise InvalidInputError("Type a full factual sentence (at least 3 words).")
         sources = read_sources(sources_text, sources_file)
-        PIPELINE.threshold, PIPELINE.top_k = float(threshold), int(top_k)
         start = time.perf_counter()
-        result = PIPELINE.verify_claim(claim, sources)
+        # threshold and top_k are passed per call: each visitor keeps their own settings
+        result = PIPELINE.verify_claim(claim, sources, threshold=float(threshold), top_k=int(top_k))
         total_ms = (time.perf_counter() - start) * 1000
     except InvalidInputError as err:
         return message(str(err)), {}
@@ -382,6 +428,12 @@ CSS = """
 .claim.no { text-decoration-color: var(--no); text-decoration-style: double; text-decoration-thickness: 2px; }
 .claim.na { text-decoration-color: var(--na); text-decoration-style: dashed; }
 .claim.un { text-decoration-color: var(--un); text-decoration-style: dotted; text-decoration-thickness: 4px; }
+.claim.nc { text-decoration-color: var(--na); text-decoration-style: wavy; text-decoration-thickness: 2px; }
+.cg-bar .seg.nc { background: repeating-linear-gradient(90deg, var(--na) 0 4px, transparent 4px 7px); }
+.cg-margin li.nc .note-head b { background: var(--na); }
+.cg-ignored { font-size: 13px; color: var(--soft); margin: 8px 0 0; }
+.dim { color: #8A93A3; }
+.lbl { font-family: 'Public Sans', sans-serif; font-size: 11.5px; color: var(--soft); }
 .claim sup { font-family: 'Public Sans', sans-serif; font-size: 11px; font-weight: 700; margin-left: 2px; color: var(--soft); }
 
 .cg-summary p { font-size: 17px; margin: 4px 0 10px; color: var(--ink); }
@@ -474,12 +526,17 @@ HEAD = (
     "<link href='https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600"
     "&family=Public+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'>"
 )
+CORPUS_HINT = (
+    f"Leave empty to search the {len(PIPELINE.corpus):,} indexed documents"
+    + (" (SciFact abstracts)." if len(PIPELINE.corpus) > 1000 else " (offline sample).")
+)
 LEGEND = (
     "<div class='cg-legend'>"
     "<span><span class='claim ok'>solid</span> supported</span>"
     "<span><span class='claim no'>double</span> contradicted</span>"
     "<span><span class='claim na'>dashed</span> not in the sources</span>"
-    "<span><span class='claim un'>dotted</span> unsure</span></div>"
+    "<span><span class='claim un'>dotted</span> unsure</span>"
+    "<span><span class='claim nc'>wavy</span> not checked</span></div>"
 )
 EMPTY_ANSWER = (
     "<div class='cg-empty'>Paste an answer written by an AI and the documents it should rely on. "
@@ -502,14 +559,38 @@ _LAUNCH_STYLE = {k: v for k, v in _STYLE.items() if k not in _BLOCKS_STYLE}
 with gr.Blocks(title="ClaimGuard", **_BLOCKS_STYLE) as demo:
     gr.HTML(
         "<div class='cg-head'><h1>ClaimGuard</h1>"
-        "<p>Checks each sentence of an AI answer against your documents. It tells you whether your "
-        "sources support a sentence, not whether the sentence is true.</p></div>"
+        "<p>Checks whether a claim is supported by a collection of documents: it finds the relevant "
+        "passages, reads them and answers supported, contradicted or not in the sources. The second tab "
+        "applies it to every sentence of an AI answer. It tells you whether your sources support a "
+        "sentence, not whether the sentence is true.</p></div>"
     )
     if STARTUP_NOTE:
         gr.HTML(f"<div class='cg-startup'>{html.escape(STARTUP_NOTE)}</div>")
 
-    with gr.Tabs(selected=os.environ.get("CLAIMGUARD_PREVIEW", "answer")):
-        with gr.Tab("Check an answer", id="answer"):
+    with gr.Tabs(selected=os.environ.get("CLAIMGUARD_PREVIEW", "claim")):
+        with gr.Tab("Check one claim", id="claim"):
+            examples = {text[:90] + ("..." if len(text) > 90 else ""): (text, src)
+                        for text, src in corpus_examples() + [[EXAMPLE_CLAIM, SOURCE_EXAMPLE]]}
+            with gr.Row(equal_height=False):
+                with gr.Column(scale=4, min_width=300, elem_classes="cg-inputs"):
+                    claim_in = gr.Textbox(label="Claim", lines=2, placeholder="One factual sentence")
+                    src_in = gr.Textbox(label="Source documents (optional)", lines=5,
+                                        placeholder=CORPUS_HINT)
+                    pick = gr.Dropdown(list(examples), label="Or pick an example", value=None)
+                    btn = gr.Button("Check the claim", variant="primary")
+                    with gr.Accordion("More options", open=False):
+                        src_file = gr.File(label="Sources as a .txt file", file_types=[".txt", ".md"],
+                                           type="filepath", height=90)
+                        thr = gr.Slider(0.0, 0.95, value=PIPELINE.threshold, step=0.05,
+                                        label="Say \"unsure\" below this confidence")
+                        topk = gr.Slider(1, 10, value=PIPELINE.top_k, step=1, label="Passages to read")
+                with gr.Column(scale=7, min_width=380):
+                    card = gr.HTML(EMPTY_CLAIM)
+                    probs = gr.State()  # the probabilities are already drawn in the card
+            pick.change(lambda key: examples.get(key, ("", "")), pick, [claim_in, src_in])
+            btn.click(verify_claim_ui, [claim_in, src_in, src_file, thr, topk], [card, probs])
+
+        with gr.Tab("Check an AI answer (extension)", id="answer"):
             with gr.Row(equal_height=False):
                 with gr.Column(scale=4, min_width=300, elem_classes="cg-inputs"):
                     answer_in = gr.Textbox(label="Answer written by an AI", lines=6,
@@ -534,29 +615,6 @@ with gr.Blocks(title="ClaimGuard", **_BLOCKS_STYLE) as demo:
             ex2.click(lambda: (ANSWER_EXAMPLE, SOURCE_EXAMPLE), None, [answer_in, src2_in])
             btn2.click(check_answer_ui, [answer_in, src2_in, src2_file, thr2], [summary, page, table])
 
-        with gr.Tab("Check one claim", id="claim"):
-            examples = {text[:90] + ("..." if len(text) > 90 else ""): (text, src)
-                        for text, src in corpus_examples() + [[EXAMPLE_CLAIM, SOURCE_EXAMPLE]]}
-            with gr.Row(equal_height=False):
-                with gr.Column(scale=4, min_width=300, elem_classes="cg-inputs"):
-                    claim_in = gr.Textbox(label="Claim", lines=2, placeholder="One factual sentence")
-                    src_in = gr.Textbox(label="Source documents (optional)", lines=5,
-                                        placeholder="Leave empty to search the 5,183 scientific abstracts "
-                                                    "of SciFact.")
-                    pick = gr.Dropdown(list(examples), label="Or pick an example", value=None)
-                    btn = gr.Button("Check the claim", variant="primary")
-                    with gr.Accordion("More options", open=False):
-                        src_file = gr.File(label="Sources as a .txt file", file_types=[".txt", ".md"],
-                                           type="filepath", height=90)
-                        thr = gr.Slider(0.0, 0.95, value=PIPELINE.threshold, step=0.05,
-                                        label="Say \"unsure\" below this confidence")
-                        topk = gr.Slider(1, 10, value=PIPELINE.top_k, step=1, label="Passages to read")
-                with gr.Column(scale=7, min_width=380):
-                    card = gr.HTML(EMPTY_CLAIM)
-                    probs = gr.State()  # the probabilities are already drawn in the card
-            pick.change(lambda key: examples.get(key, ("", "")), pick, [claim_in, src_in])
-            btn.click(verify_claim_ui, [claim_in, src_in, src_file, thr, topk], [card, probs])
-
         with gr.Tab("Audit log", id="audit"):
             gr.HTML(
                 "<p class='cg-foot' style='font-size:14px'>Every verdict is written to <code>logs/audit.jsonl</code> "
@@ -579,7 +637,7 @@ with gr.Blocks(title="ClaimGuard", **_BLOCKS_STYLE) as demo:
 
 if __name__ == "__main__":
     demo.launch(
-        server_name="0.0.0.0",
+        server_name=os.environ.get("SERVER_NAME", "127.0.0.1"),  # Docker sets 0.0.0.0
         server_port=int(os.environ.get("PORT", 7860)),
         share=bool(os.environ.get("GRADIO_SHARE")),  # public link, handy on Colab
         **_LAUNCH_STYLE,

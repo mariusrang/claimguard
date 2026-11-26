@@ -144,11 +144,18 @@ def test_run_multihop_script_end_to_end(tiny_tokenizer, tmp_path, monkeypatch):
         "run_multihop.py", "--hover-dir", str(hover), "--wiki", str(corpus), "--verifier", str(model_dir),
         "--zero-shot", str(model_dir), "--reranker", "lexical", "--per-cell", "2", "--train-joint",
         "--train-per-cell", "2", "--epochs", "1", "--out", str(out), "--model-out", str(tmp_path / "reader"),
+        "--reader-seeds", "13", "42",
     ])
     run_multihop.main()
     res = json.loads((out / "multihop.json").read_text())
     assert res["n_dev"] == 8 and res["gold_coverage"] == 1.0
-    assert set(res["e1_gold"]) == {"zero_shot", "scifact_finetuned", "hover_joint_trained"}
+    assert set(res["e1_gold"]) == {"zero_shot", "scifact_finetuned", "hover_joint_trained", "hover_joint_trained_seed42"}
+    assert set(res["e3_training"]["runs"]) == {"13", "42"}
+    assert res["pool_kind"].startswith("dev_")  # the training articles never enter the pool
+    assert "independent_truncated" in res["e1_gold"]["zero_shot"]
+    for k in (5, 10):  # the full 2 x 2 table, at two depths
+        assert {f"top{k}:{m}+{r}" for m in ("single_shot", "iterative") for r in ("independent_noisy_or", "joint")} <= set(res["e2b_end_to_end"])
+        assert f"top{k}:mcnemar_best_vs_claimguard" in res["e2b_end_to_end"]
     assert "joint" in res["e1_gold"]["zero_shot"] and "2_hops" in res["e1_gold"]["zero_shot"]["joint"]
     assert "all_found@10" in res["e2_retrieval"]["iterative"]
     assert res["e2b_end_to_end"]["reader"] == "hover_joint_trained"

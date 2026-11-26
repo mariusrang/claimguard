@@ -58,6 +58,21 @@ def test_pipeline_sources_mode_and_answer(offline_pipeline):
     assert results[0].evidence[0].source.startswith("source 1")
 
 
+def test_answer_reports_every_statement_and_per_call_settings(offline_pipeline, tmp_path):
+    from claimguard.audit import AuditLogger
+
+    offline_pipeline.audit = AuditLogger(tmp_path / "audit.jsonl")
+    source = "Early repayment is charged 3% of the remaining capital. Application fees are 900 euros."
+    answer = "Sure, early repayment is free. Yes. Fees: none? OK."
+    results = offline_pipeline.verify_answer(answer, [source], threshold=0.95, top_k=1)
+    assert results[0].claim == "Early repayment is free."  # the opening is removed, the claim kept
+    assert results[0].threshold == 0.95 and results[0].top_k == 1
+    assert offline_pipeline.threshold != 0.95  # the shared object is not modified
+    log = offline_pipeline.audit.tail(10)
+    assert log[0]["threshold"] == 0.95 and log[0]["top_k"] == 1 and "threshold=0.95" in log[0]["model_version"]
+    offline_pipeline.audit = None
+
+
 def test_pipeline_abstains_below_threshold(offline_pipeline):
     offline_pipeline.threshold = 0.99
     result = offline_pipeline.verify_claim("Statins reduce LDL cholesterol by 30 to 40 percent.")
@@ -128,7 +143,8 @@ def test_mcp_tools(offline_pipeline):
     out = mcp_server.verify_claim("Aspirin does not increase the risk of gastrointestinal bleeding.", [source])
     assert out["decision"] == "REFUTED" and out["evidence"] == source
     answer = mcp_server.verify_answer("Aspirin increases the risk of gastrointestinal bleeding. Is it ok?", [source])
-    assert answer["n_claims"] == 1 and answer["n_flagged"] == 0
+    assert answer["n_statements"] == 1 and answer["n_flagged"] == 0
+    assert answer["ignored_sentences"] == [{"sentence": "Is it ok?", "reason": "a question is not a statement"}]
     cites = mcp_server.verify_citations([{"sentence": source, "cited_text": source}])
     assert cites["citations"][0]["decision"] == "SUPPORTED"
     assert mcp_server.verify_claim("", None) == {"error": "The claim is empty."}
@@ -156,7 +172,10 @@ def test_demo_handlers(monkeypatch, tmp_path):
     bad_file.write_bytes(b"%PDF")
     assert "upload a .txt" in app.verify_claim_ui("Aspirin lowers the risk of heart attack.", "", str(bad_file), 0.0, 5)[0]
     summary, page, rows = app.check_answer_ui(app.ANSWER_EXAMPLE, app.SOURCE_EXAMPLE, None, 0.0)
-    assert "5 claims checked" in summary and len(rows) == 5
+    assert "5 claims, 3 to review" in summary and len(rows) == 5
+    assert "   " and "empty" in app.verify_claim_ui("   ", "", None, 0.0, 5)[0]  # spaces: empty, not "3 words"
+    assert "Offline mode" in app.STARTUP_NOTE and "12-document" in app.STARTUP_NOTE  # honest banner
+    assert "12 indexed documents" in app.CORPUS_HINT
     assert page.count("class='claim ") == 5 and "Model size" in page
     # the contradicted rate must come back as contradicted, with the source passage in the margin
     assert rows[0][2] == "Contradicted" and "3.45%" in page

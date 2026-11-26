@@ -1,4 +1,4 @@
-"""ClaimGuard: evidence-based claim verification with calibrated abstention."""
+"""ClaimGuard: evidence-based claim verification with abstention."""
 
 __version__ = "0.1.0"
 

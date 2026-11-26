@@ -152,3 +152,23 @@ def load_evidence_claims(path: str | Path) -> list[EvidenceClaim]:
             )
         )
     return out
+
+
+def ensure_processed_sample(root: str | Path = ".") -> Path:
+    """Build data/processed/sample from data/sample if it is missing.
+
+    On a fresh clone (or when the Docker volume hides the prepared folder) the offline
+    demo would otherwise load an empty corpus. Used by the demo and by the tests."""
+    import subprocess
+    import sys
+
+    root = Path(root)
+    out = root / "data" / "processed" / "sample"
+    if not (out / "corpus.jsonl").exists():
+        for script, args in (
+            ("preprocess.py", ["--raw", str(root / "data" / "sample"), "--out", str(out)]),
+            ("build_contrast_set.py", ["--data", str(out)]),
+        ):
+            subprocess.run([sys.executable, str(root / "data" / "scripts" / script), *args],
+                           check=True, cwd=root, stdout=subprocess.DEVNULL)
+    return out
