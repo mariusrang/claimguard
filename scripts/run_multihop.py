@@ -251,15 +251,17 @@ def plot(results: dict, path: Path) -> None:
     hops = [h for h in ("2_hops", "3_hops", "4_hops") if h in some]  # the ones present in the sample
     xs = [int(h[0]) for h in hops]
     names = {"zero_shot": "zero-shot NLI", "scifact_finetuned": "SciFact-tuned", "hover_joint_trained": "HoVer-tuned"}
+    colors = {"zero_shot": "#4C72B0", "scifact_finetuned": "#DD8452", "hover_joint_trained": "#55A868"}
     for key, label in names.items():
         if key not in results["e1_gold"]:
             continue
         for reading, style in (("independent_noisy_or", "--"), ("joint", "-")):
             ys = [results["e1_gold"][key][reading][h]["accuracy"]["value"] for h in hops]
-            ax1.plot(xs, ys, style, marker="o", label=f"{label}, {'one by one' if style == '--' else 'together'}")
-    ax1.set(xlabel="number of hops", ylabel="accuracy (gold articles)", xticks=xs, ylim=(0.4, 1.0))
+            ax1.plot(xs, ys, style, marker="o", color=colors[key],
+                     label=f"{label}, {'one by one' if style == '--' else 'together'}")
+    ax1.set(xlabel="number of hops", ylabel="accuracy (gold articles)", xticks=xs, ylim=(0.3, 1.0))
     ax1.axhline(0.5, color="grey", lw=0.8)
-    ax1.legend(fontsize=7)
+    ax1.legend(fontsize=7, ncol=2, loc="lower left")
     for mode, style in (("single_shot", "--"), ("iterative", "-")):
         block = results["e2_retrieval"][mode]["all_found@10"]
         ax2.plot(xs, [block[h]["value"] for h in hops], style, marker="o", label=mode.replace("_", " "))

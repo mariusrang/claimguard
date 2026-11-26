@@ -13,3 +13,9 @@ Two Kaggle runs (GPU T4), 23-24 Nov 2026.
 - Run 3 (notebook 05, 24 Nov, same trained verifier as run 2, loaded from the run-2 output): given_climate_zeroshot,
   given_contrast_zeroshot, efficiency.json (3 INT8 recipes), and per-example predictions on Climate-FEVER and the
   contrast set. given_climate / given_contrast were re-computed and are identical to run 2 (deterministic inference).
+- `multihop.json`, `hover_joint_reader_train_log.json`, `figures/multihop.png`: Kaggle
+  session 4 (26 Nov), notebook `notebooks/06_kaggle_multihop.ipynb`, 35 min on a T4.
+  Wikipedia text from the HoVer authors' server (their TF-IDF file was reachable, so the
+  fallback to the BEIR copy was most likely not used; check the notebook log), pool = their
+  TF-IDF top-100 candidates + gold articles (56,417 articles). Figure redrawn locally
+  from the same JSON (colours only).

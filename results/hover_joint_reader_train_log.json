@@ -1,0 +1,25 @@
+{
+  "base_model": "models/verifier",
+  "seed": 13,
+  "lr": 2e-05,
+  "epochs": 2,
+  "batch_size": 8,
+  "n_train_pairs": 3780,
+  "best_dev_macro_f1": 0.5682182500075613,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.5625399082544305,
+      "accuracy": 0.8523809523809524,
+      "macro_f1": 0.5682182500075613,
+      "n": 420
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.2831835032544202,
+      "accuracy": 0.8380952380952381,
+      "macro_f1": 0.5587081263749972,
+      "n": 420
+    }
+  ]
+}

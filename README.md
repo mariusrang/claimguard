@@ -3,7 +3,7 @@
 Evidence-based claim verification with calibrated abstention.
 NLP final project — topic 2, *Fact Verification with Evidence Retrieval*.
 
-![tests](https://img.shields.io/badge/tests-67%20passing-brightgreen) ![coverage](https://img.shields.io/badge/coverage-90%25-green) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![tests](https://img.shields.io/badge/tests-74%20passing-brightgreen) ![coverage](https://img.shields.io/badge/coverage-90%25-green) ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 ## Overview
 
@@ -42,7 +42,7 @@ a CUDA GPU for training (a free Kaggle or Colab T4 is enough). Everything else a
 git clone <this repo> && cd claimguard
 python -m venv .venv && source .venv/bin/activate
 make install          # pip install -r requirements-dev.txt && pip install -e .
-make test             # 67 unit tests (plain `pytest` works too), no download needed
+make test             # 74 unit tests (plain `pytest` works too), no download needed
 ```
 
 Quick try without downloading any model (BM25 + rule-based verifier on a toy corpus):
@@ -249,6 +249,25 @@ numbers. On LLM-AggreFact the fine-tuned model is no better than the zero-shot o
 fine-tuning on scientific abstracts does not transfer to summaries of news and
 dialogues.
 
+**Multi-hop claims (HoVer).** Some claims need several articles at once ("the director
+of film X was born in Y"). On 600 HoVer dev claims with the gold articles given, reading
+them **together** in one premise beats reading them one by one and combining the scores
+(as ClaimGuard does) for every reader, and a joint reader fine-tuned on HoVer training
+claims stays at 0.85 accuracy whatever the number of hops (chance = 0.5):
+
+| Reader | One by one | Together | 2 / 3 / 4 hops (together) |
+| --- | --- | --- | --- |
+| Zero-shot NLI | 0.613 | 0.723 | 0.815 / 0.690 / 0.665 |
+| My SciFact verifier | 0.620 | 0.677 | 0.740 / 0.660 / 0.630 |
+| Joint reader trained on HoVer | 0.553 | **0.855** | 0.860 / 0.855 / 0.850 |
+
+Retrieval is the bottleneck: in a pool of 56,417 Wikipedia articles, all the needed
+articles are in the top 10 for 73% / 21% / 3% of the 2 / 3 / 4-hop claims. A second
+search round helps a little (35% against 32% overall, McNemar p = 0.008). End to end,
+the accuracy goes from 0.537 (one round, one by one) to 0.650 (two rounds, together).
+Code: `src/claimguard/multihop.py`, `scripts/run_multihop.py`; results in
+`results/multihop.json` and `results/figures/multihop.png`.
+
 **Efficiency.** 184M parameters, 738 MB in FP32. Dynamic INT8 quantization shrinks it
 to 481 MB but accuracy falls from 0.856 to 0.407 (0.455 with only the feed-forward
 layers quantized), so I did not keep it (details in `DECISIONS.md`).
@@ -366,11 +385,11 @@ claimguard/
 │   ├── verify/              # nli.py, train.py, lexical.py, llm_judge.py
 │   ├── aggregate.py  calibrate.py  metrics.py  stats.py
 │   ├── pipeline.py  decompose.py  contrast.py  audit.py  efficiency.py  aggrefact.py
-│   ├── mcp_server.py  data.py  text.py  utils.py
-├── scripts/                 # train_verifier.py, evaluate.py, make_tables.py, make_figures.py
-├── notebooks/               # 03_kaggle_run_all.ipynb, 01_colab_run_all.ipynb, 02_error_analysis.ipynb
+│   ├── mcp_server.py  data.py  text.py  utils.py  multihop.py
+├── scripts/                 # train_verifier.py, evaluate.py, run_multihop.py, make_tables.py, make_figures.py, build_report.py
+├── notebooks/               # 03-06 Kaggle sessions (06 = multi-hop), 01 Colab, 02 error analysis
 ├── configs/                 # default.yaml, offline.yaml, train_verifier.yaml
-├── tests/                   # 67 tests: preprocessing, retrieval, metrics, model, pipeline
+├── tests/                   # 74 tests: preprocessing, retrieval, metrics, model, pipeline, multi-hop
 ├── app.py                   # Gradio demo
 ├── Dockerfile  Makefile  requirements.txt  pyproject.toml
 ├── README.md  PLAN.md  DECISIONS.md
@@ -382,7 +401,8 @@ claimguard/
 - A learned aggregator over the evidence representations (cut here: too little data
   to train it without overfitting).
 - Claim decomposition with a small LLM, with pronoun resolution.
-- Multi-hop claims that need two documents together (HoVer).
+- A retriever trained for multi-hop search: my iterative search finds all the articles
+  of a 4-hop HoVer claim for only 4% of the claims.
 - Long documents with tables (the current chunking is by sentences only).
 - A Claude Code hook that calls the verifier after every answer.
 - Calibration per claim type (a 0.9 on an amount is not the same as on a description).
