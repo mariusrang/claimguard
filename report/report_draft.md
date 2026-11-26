@@ -582,6 +582,9 @@ evidence" to statins instead of to the other drugs.
 
 **What a company would still need.** If we showed this to a bank tomorrow, we'd start with an analyst reviewing a draft. In the demo, the analyst can see the passage behind a verdict. For a flagged rate, we'd want the amount, currency and date highlighted so the analyst could check all three at a glance. We'd also test a product sheet that lists several rates. Does the tool pick the rate for the right product and period? Is it using the latest version of the sheet? Before a rollout, we'd run a pilot on the bank's own documents and measure how many important mistakes the tool catches and how much time analysts spend reviewing its alerts.
 
+**Ethical considerations.** When ClaimGuard says SUPPORTED, it means the documents we gave it back up the claim. If a product sheet lists the wrong rate, a claim that repeats that rate can still get a SUPPORTED verdict. It's easy to read that label as proof that the rate is correct, especially when the score is high. In our review, 44 of the 110 wrong answers had a confidence score of at least 0.8. Someone should always read the original passage before making a decision based on the result.
+SciFact uses English biomedical texts, and we wrote the 60 claims in our French banking set ourselves. We'd need more testing before we could expect similar results in other languages or fields. ClaimGuard runs locally without calling any external APIs, but the audit log still saves the claims people enter. A company using it should decide how long to keep those claims and delete them when that time is up.
+
 **Limitations.** (1) Faithfulness, not truth: a claim that repeats a wrong document
 is SUPPORTED. (2) The test set has 300 claims, so intervals are wide and small
 differences are hard to interpret. (3) SciFact annotations are incomplete, so some hard
@@ -597,6 +600,13 @@ claims but not for multi-hop ones. Multi-hop retrieval is weak: all the articles
 Three things stuck with us from building ClaimGuard. A small model trained on a similar task came close to the 7B judge on SciFact and ran about 25 times faster on the same GPU. Changing a single number showed us a weakness we'd have missed if we'd only looked at the overall score. And the feature we'd most want as users is being able to click on a verdict and read the sentence behind it, especially when the model sounds sure of itself.
 
 We'd start by checking confidence separately for different kinds of claims. An analyst might handle a flagged interest rate differently from a flagged product description. With more labelled examples, we'd also test whether a model can learn to combine passages better than noisy-OR. A small LLM could help split longer answers into claims, and multi-hop dense retrieval (Xiong et al., 2021) could find the missing bridge articles. We'd compare ClaimGuard with MiniCheck on the full LLM-AggreFact benchmark. For the demo, we'd add the option to run the verifier automatically after each assistant answer.
+
+**Use of AI tools.** Claude Code (Anthropic) was used as a coding assistant for parts
+of the code and the Kaggle notebooks, for first drafts of some report sections, which
+I then rewrote, and to review the project before submission. The project design, the
+choice of experiments, the reading of the results and the annotation of the 110 errors
+are my own work. No AI model produced any label used in the evaluation; the only
+language models in the results are the systems being evaluated.
 
 ## References
 

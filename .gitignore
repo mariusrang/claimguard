@@ -16,3 +16,5 @@ models/*
 !models/*.py
 logs/
 results/predictions*.jsonl
+# Windows / OneDrive
+desktop.ini
