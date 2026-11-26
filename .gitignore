@@ -14,7 +14,8 @@ data/processed/*
 models/*
 !models/.gitkeep
 !models/*.py
+# T, k, aggregation and threshold chosen on dev: tiny, needed by the demo
+!models/calibration.json
 logs/
-results/predictions*.jsonl
 # Windows / OneDrive
 desktop.ini

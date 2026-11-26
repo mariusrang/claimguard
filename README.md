@@ -142,6 +142,15 @@ test ECE worse (0.206 → 0.258), so T is now fitted on claim-level probabilitie
 
 ## Training
 
+**Getting the fine-tuned verifier.** The weights (738 MB) are not in git. Either retrain
+them (one command below, about 15 minutes on a free Kaggle T4, seed 13 reproduces the main
+system), or put an existing checkpoint in `models/verifier/`. `models/calibration.json`
+(temperature, k, aggregation and threshold chosen on dev) is versioned, and so are the
+per-claim predictions of every system (`results/predictions*.jsonl`), so every table and
+test in the report can be recomputed without a GPU (`make tables`,
+`python scripts/paired_tests.py`).
+
+
 ```bash
 python scripts/train_verifier.py --config configs/train_verifier.yaml              # one seed
 python scripts/train_verifier.py --config configs/train_verifier.yaml --all-seeds  # 3 seeds
